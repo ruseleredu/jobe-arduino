@@ -1,36 +1,79 @@
 # jobe-arduino
 
-Testar **lógica pura** de código estilo Arduino/PlatformIO no sandbox **Jobe**,
-sem hardware, sem rede e sem Moodle. O código do aluno compila contra **mocks**
-(`Arduino.h`, `WiFi.h`, `PubSubClient.h`) e a avaliação compara o `stdout`.
+Testar **lógica pura** de C/C++ e código estilo Arduino no sandbox **Jobe**
+(Docker), sem hardware e sem Moodle — e **gerar questões CodeRunner** (XML) para
+importar no Moodle a partir das mesmas pastas.
 
-> Fronteira: isto testa lógica (bits, operadores, controle, tipos, montagem de
-> payload, callbacks MQTT). **Firmware real** (WiFi, GPIO, timing, broker de
-> verdade) → `pio run` + **Wokwi**/ESP32 físico.
+> Fronteira: isto testa lógica (bits, operadores, controle, tipos, funções,
+> montagem de payload, callbacks MQTT). **Firmware real** (WiFi, GPIO, timing,
+> broker) → `pio run` + **Wokwi**/ESP32 físico.
 
 ## Pré-requisitos
-- **Docker** (único requisito — não precisa de g++ na máquina).
-- **Python 3** (só a biblioteca padrão; nenhuma dependência a instalar).
+- **Docker** (único requisito para rodar — não precisa de g++ na máquina).
+- **Python 3** (só biblioteca padrão; nada a instalar).
 
-## 1) Suba o Jobe
-
+## Suba o Jobe
 ```bash
-docker compose up -d          # usa o docker-compose.yml deste repo
-# confira (deve listar as linguagens, incluindo "cpp"):
-curl http://localhost:4000/jobe/index.php/restapi/languages
+docker compose up -d          # usa o docker-compose.yml deste repo (Jobe em :4000)
+curl http://localhost:4000/jobe/index.php/restapi/languages   # deve listar "c", "cpp", ...
+```
+Sem compose: `docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest`
+(depois `docker start jobe` / `docker stop jobe`).
+
+---
+
+## Convenção de pasta por questão
+
+Cada questão é uma pasta (o nome da pasta é a "base"). Ex.: `questions/sqr/`:
+
+```
+sqr/
+├── question.json        # metadados (nome, tipo, nota, penaltyregime, mocks[])
+├── questiontext.html    # enunciado (HTML)       → <questiontext> no Moodle
+├── answerpreload.cpp    # base para o aluno      → <answerpreload>
+├── sqr_sol.cpp          # solução de referência  → <answer>   (fallback: sol.cpp)
+└── sqr_tests.json       # casos de teste         → <testcases> (fallback: tests.json)
 ```
 
-Alternativa sem compose:
+**`question.json`:**
+```json
+{
+  "name": "C function: sqr",
+  "type": "c_function",
+  "defaultgrade": 1,
+  "allornothing": 1,
+  "penaltyregime": "0, 10, 20, ...",
+  "mocks": []
+}
+```
+- `type`: `c_function`, `c_program`, `cpp_function`, `cpp_program`.
+- `mocks`: vazio para C/C++ puro; `["arduino-mock/Arduino.h", ...]` para questões Arduino.
+
+**`*_tests.json`** (alinhado ao CodeRunner — mesmo arquivo serve ao teste e ao XML):
+```json
+[
+  { "testcode": "printf(\"%d\\n\", sqr(9))", "expected": "81", "example": true },
+  { "testcode": "printf(\"%d\\n\", sqr(0))", "expected": "0", "display": "HIDE" }
+]
+```
+- `testcode`: trecho que chama a função do aluno e imprime (sem `;` final — é acrescentado).
+- `expected`: saída esperada. `stdin` (opcional): entrada no stdin.
+- `example: true` → aparece na tabela "Por exemplo". `display: "HIDE"` → teste oculto.
+
+---
+
+## Testar no Jobe — `jobe_test.py`
+
+**Modo pasta** (recomendado): valida a solução de referência contra os testes
+(como o "validate on save" do CodeRunner). `--jobe` tem default `http://localhost:4000`.
+
 ```bash
-docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest
-# depois: docker start jobe / docker stop jobe
+python jobe_test.py sqr                      # testa a referência (sqr_sol.cpp)
+python jobe_test.py sqr --answer entrega.cpp # testa a entrega de um aluno
+python jobe_test.py ehpar                     # questão com mock Arduino
 ```
 
-## 2) Rode um teste
-
-`--jobe` tem default `http://localhost:4000`, então pode ser omitido.
-
-**Exemplo mínimo (Serial.println):**
+**Modo flags** (legado — exemplos Arduino com harness e stdin):
 ```bash
 python jobe_test.py \
   --mock arduino-mock/Arduino.h \
@@ -39,68 +82,46 @@ python jobe_test.py \
   --tests exemplos/hello_tests.json
 ```
 
-**Função pura (lê stdin):**
+Desfechos por caso: **OK** · **SAIDA DIFERENTE** (mostra esperado × obtido) ·
+**ERRO DE COMPILACAO** (mostra o `cmpinfo`). Código de saída `0` só se todos passam.
+
+---
+
+## Gerar XML para o Moodle — `gen_moodle_xml.py`
+
 ```bash
-python jobe_test.py \
-  --mock arduino-mock/Arduino.h \
-  --student sol.cpp \
-  --harness harness/harness_funcao.cpp \
-  --tests tests.json
+python gen_moodle_xml.py questions/sqr                       # 1 questão → stdout
+python gen_moodle_xml.py questions/sqr questions/ehpar -o banco.xml
 ```
 
-**MQTT (vários mocks — repita `--mock`):**
-```bash
-python jobe_test.py \
-  --mock arduino-mock/Arduino.h --mock arduino-mock/WiFi.h --mock arduino-mock/PubSubClient.h \
-  --student exemplos/callback_sol.cpp \
-  --harness harness/harness_callback.cpp \
-  --tests exemplos/callback_tests.json
-```
+Importe no Moodle em **Banco de questões → Importar → formato Moodle XML**.
 
-Jobe em outro host/porta ou com chave: `--jobe http://IP:4000 --apikey SUA-CHAVE`.
+**Questões com mocks Arduino:** quando `question.json` tem `mocks`, o gerador
+embute o conteúdo dos mocks em `<globalextra>` e usa um `<template>` C++
+determinístico (`globalextra` + resposta do aluno + `main` com o `testcode`), com
+`type` `cpp_function`. Assim o aluno escreve só a função (ex.: `ehPar`) e o mock
+de `Arduino.h` fica disponível na compilação dentro do CodeRunner.
 
-## Como funciona
-O `jobe_test.py` junta **mock(s) + código do aluno (sem os `#include` dos mocks) +
-harness** num único `.cpp`, envia ao Jobe (`POST .../restapi/runs`) e compara o
-`stdout` com o `expected` de cada caso.
+---
 
-Três desfechos:
-- **OK** → compilou, rodou e a saída bateu.
-- **SAIDA DIFERENTE** → rodou, mas o texto não confere (mostra esperado × obtido).
-- **ERRO DE COMPILACAO** → nem compilou (mostra a mensagem do compilador = `cmpinfo`, outcome 11 do Jobe).
+## Fluxo recomendado
+1. Crie a pasta da questão (enunciado, solução, testes, base do aluno).
+2. `python jobe_test.py <pasta>` → confirme que a referência passa nos testes.
+3. `python gen_moodle_xml.py <pasta> -o banco.xml` → importe no Moodle.
 
-Código de saída `0` só quando **todos** os casos passam (pronto para CI).
+## Importante (Jobe é estrito)
+O Jobe compila com `-Wall -Werror` (warnings viram erros). Mocks e código de apoio
+precisam compilar limpos sob essas flags. Tipos: o host do Jobe é 64 bits — se o
+teste depende do tamanho do ESP32, use `int32_t`/`uint8_t` explícitos.
 
-## Estrutura
+## Estrutura do repo
 ```
 jobe-arduino/
 ├── docker-compose.yml          # sobe o Jobe em :4000
-├── jobe_test.py                # driver (só-Jobe; sem modo local)
-├── arduino-mock/
-│   ├── Arduino.h               # bit macros, String, Serial->stdout, pinos, millis...
-│   ├── WiFi.h                  # WiFiClient + objeto WiFi
-│   └── PubSubClient.h          # mock MQTT: registra publish/subscribe, injeta mensagens
-├── harness/
-│   ├── driver_sketch.cpp       # chama setup() uma vez (sketch)
-│   ├── harness_funcao.cpp      # chama uma função lendo o stdin
-│   ├── harness_payload.cpp     # imprime o payload montado pelo aluno
-│   └── harness_callback.cpp    # injeta um comando e imprime o estado do LED
-├── exemplos/                   # soluções + *_tests.json (hello, payload, callback)
-├── sol.cpp / tests.json        # exemplo de função
+├── jobe_test.py                # testa no Jobe (modo pasta + modo flags)
+├── gen_moodle_xml.py           # gera XML CodeRunner das pastas de questão
+├── questions/                  # uma pasta por questão (sqr, ehpar, ...)
+├── arduino-mock/               # Arduino.h, WiFi.h, PubSubClient.h (mocks)
+├── harness/                    # drivers do modo flags
+└── exemplos/                   # exemplos do modo flags (hello, payload, callback)
 ```
-
-## tests.json
-```json
-[
-  { "input": "4\n", "expected": "1\n" },
-  { "input": "7\n", "expected": "0\n" }
-]
-```
-`input` = stdin do caso · `expected` = stdout esperado (comparação tolerante a
-espaços no fim das linhas).
-
-## Limites do mock
-Não simula hardware/rede/timing: `digitalRead` é injetável, `millis()` é um
-contador falso, `delay()` não espera, `publish`/`subscribe` apenas registram.
-Serve para lógica e saída serial. Tipos: o host do Jobe é 64 bits — se o teste
-depende do tamanho do ESP32, use `int32_t`/`uint8_t` explícitos.

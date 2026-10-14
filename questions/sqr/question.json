@@ -1,0 +1,11 @@
+{
+  "name": "C function: sqr",
+  "type": "c_function",
+  "defaultgrade": 1,
+  "penalty": 0,
+  "allornothing": 1,
+  "precheck": 0,
+  "penaltyregime": "0, 10, 20, ...",
+  "answerboxlines": 8,
+  "mocks": []
+}
