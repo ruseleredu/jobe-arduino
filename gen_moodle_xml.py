@@ -129,8 +129,13 @@ def carrega_questao(folder):
         raise SystemExit(f"ERRO [{base}]: nao achei os testes (ex.: {base}_tests.json ou tests.json)")
     q["testcases"] = json.loads(tf.read_text(encoding="utf-8"))
 
-    # Questoes com mocks Arduino: embute os mocks em globalextra + template C++.
+    # guarda infos usadas pela validacao (--validate)
+    q["base"] = base
     mocks = meta.get("mocks", [])
+    q["mock_paths"] = [str(_resolve_mock(folder, m)) for m in mocks] if mocks else []
+    q["answer_raw"] = q["answer"]
+
+    # Questoes com mocks Arduino: embute os mocks em globalextra + template C++.
     if mocks:
         partes = [_strip_mock_includes(_resolve_mock(folder, m).read_text(encoding="utf-8")) for m in mocks]
         q["globalextra"] = "\n".join(partes)
@@ -248,22 +253,106 @@ def render_quiz(questoes):
 """
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description="Gera XML CodeRunner (Moodle) de pasta(s) de questao.")
-    ap.add_argument("folders", nargs="+", help="pasta(s) de questao (cada uma vira uma <question>)")
-    ap.add_argument("-o", "--output", help="arquivo .xml de saida (default: stdout)")
-    args = ap.parse_args(argv)
+def eh_pasta_questao(p):
+    """True se p parece uma pasta de questao (tem question.json ou uma solucao)."""
+    if (p / "question.json").is_file():
+        return True
+    base = p.name
+    for n in (f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c",
+              f"{base}_sol.py", "sol.py"):
+        if (p / n).is_file():
+            return True
+    return False
 
-    questoes = []
-    for f in args.folders:
+
+def expandir_pastas(paths):
+    """Cada arg: uma pasta-questao vira ela mesma; uma pasta-contêiner vira suas
+    subpastas-questao (ordenadas). Permite `questions` ou `questions/*`."""
+    out = []
+    for f in paths:
         p = Path(f)
         if not p.is_dir():
             print(f"aviso: ignorando '{f}' (nao e pasta)", file=sys.stderr)
             continue
-        questoes.append(carrega_questao(p))
+        if eh_pasta_questao(p):
+            out.append(p)
+        else:
+            subs = [d for d in sorted(p.iterdir()) if d.is_dir() and eh_pasta_questao(d)]
+            if subs:
+                out.extend(subs)
+            else:
+                print(f"aviso: '{f}' nao e questao nem contem questoes", file=sys.stderr)
+    # remove duplicatas preservando a ordem
+    vistos, unicas = set(), []
+    for d in out:
+        r = d.resolve()
+        if r not in vistos:
+            vistos.add(r); unicas.append(d)
+    return unicas
 
-    if not questoes:
+
+def validar(questoes, jobe_url, apikey):
+    """Roda a solucao de referencia de cada questao no Jobe. Retorna (ok, relatorio)."""
+    try:
+        import jobe_test as jt
+    except Exception as e:  # noqa: BLE001
+        print(f"ERRO: --validate precisa de jobe_test.py ao lado deste script ({e})", file=sys.stderr)
+        return False, []
+
+    ok, detalhe = jt.jobe_no_ar(jobe_url, apikey)
+    if not ok:
+        print(f"ERRO: Jobe indisponivel em {jobe_url}: {detalhe}\n"
+              "  docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest", file=sys.stderr)
+        return False, []
+
+    relatorio, tudo_ok = [], True
+    for q in questoes:
+        qtype = q.get("type", "c_function")
+        mocks = q.get("mock_paths", [])
+        answer = q.get("answer_raw", q.get("answer", ""))
+        casos = q.get("testcases", [])
+        falhas = []
+        for i, c in enumerate(casos, 1):
+            src, lang = jt.build_question_source(mocks, answer, qtype, c.get("testcode", ""))
+            res = jt.run_jobe(jobe_url, src, c.get("stdin", ""), apikey, language=lang)
+            if res["outcome"] == 11:
+                falhas.append(f"TC{i}: erro de compilacao")
+            elif res["outcome"] != jt.OK:
+                falhas.append(f"TC{i}: outcome={res['outcome']}")
+            elif jt.norm(res["stdout"]) != jt.norm(c.get("expected", "")):
+                falhas.append(f"TC{i}: saida != esperado ({res['stdout']!r} vs {c.get('expected','')!r})")
+        if falhas:
+            tudo_ok = False
+            relatorio.append(f"  [X] {q['base']} ({len(casos)-len(falhas)}/{len(casos)}): " + "; ".join(falhas))
+        else:
+            relatorio.append(f"  [ok] {q['base']} ({len(casos)}/{len(casos)})")
+    return tudo_ok, relatorio
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Gera XML CodeRunner (Moodle) de pasta(s) de questao.")
+    ap.add_argument("folders", nargs="+",
+                    help="pasta(s) de questao ou contêiner (ex.: questions/sqr, ou questions, ou questions/*)")
+    ap.add_argument("-o", "--output", help="arquivo .xml de saida (default: stdout)")
+    ap.add_argument("--validate", action="store_true",
+                    help="roda a solucao de referencia no Jobe antes de gerar; falha se algum teste nao passar")
+    ap.add_argument("--jobe", default="http://localhost:4000", help="URL do Jobe (para --validate)")
+    ap.add_argument("--apikey", help="X-API-KEY do Jobe (para --validate)")
+    args = ap.parse_args(argv)
+
+    pastas = expandir_pastas(args.folders)
+    if not pastas:
         ap.error("nenhuma pasta de questao valida encontrada")
+    questoes = [carrega_questao(p) for p in pastas]
+
+    if args.validate:
+        tudo_ok, relatorio = validar(questoes, args.jobe, args.apikey)
+        print("Validacao no Jobe:", file=sys.stderr)
+        for linha in relatorio:
+            print(linha, file=sys.stderr)
+        if not tudo_ok:
+            print("\nXML NAO gerado: corrija as questoes acima.", file=sys.stderr)
+            return 1
 
     xml = render_quiz(questoes)
     if args.output:

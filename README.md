@@ -90,8 +90,23 @@ Desfechos por caso: **OK** · **SAIDA DIFERENTE** (mostra esperado × obtido) ·
 ## Gerar XML para o Moodle — `gen_moodle_xml.py`
 
 ```bash
-python gen_moodle_xml.py questions/sqr                       # 1 questão → stdout
+python gen_moodle_xml.py questions/sqr                        # 1 questão → stdout
 python gen_moodle_xml.py questions/sqr questions/ehpar -o banco.xml
+python gen_moodle_xml.py questions -o banco.xml               # todas as subpastas de questions/
+python gen_moodle_xml.py questions/* -o banco.xml             # idem (glob do shell)
+```
+
+Um argumento que é uma **pasta-questão** vira uma questão; um argumento que é uma
+**pasta-contêiner** (ex.: `questions`) expande para todas as subpastas-questão. Assim
+`questions` (contêiner) e `questions/*` (glob do bash) dão o mesmo resultado.
+
+**Validação opcional antes de gerar** (`--validate`): roda a solução de referência
+de cada questão no Jobe; se algum teste não passar, imprime o relatório e **não gera
+o XML** (exit ≠ 0). Ideal para CI.
+
+```bash
+python gen_moodle_xml.py questions --validate -o banco.xml
+# Jobe em outro host/porta: --jobe http://IP:4000  (--apikey se exigido)
 ```
 
 Importe no Moodle em **Banco de questões → Importar → formato Moodle XML**.
