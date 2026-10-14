@@ -1,5 +1,17 @@
 [
-  { "testcode": "printf(\"%d\\n\", ehPar(4) ? 1 : 0)", "expected": "1", "example": true },
-  { "testcode": "printf(\"%d\\n\", ehPar(7) ? 1 : 0)", "expected": "0", "example": true },
-  { "testcode": "printf(\"%d\\n\", ehPar(0) ? 1 : 0)", "expected": "1", "display": "HIDE" }
+  {
+    "testcode": "printf(\"%d\\n\", ehPar(4) ? 1 : 0)",
+    "expected": "1",
+    "example": true
+  },
+  {
+    "testcode": "printf(\"%d\\n\", ehPar(7) ? 1 : 0)",
+    "expected": "0",
+    "example": true
+  },
+  {
+    "testcode": "printf(\"%d\\n\", ehPar(0) ? 1 : 0)",
+    "expected": "1",
+    "display": "HIDE"
+  }
 ]

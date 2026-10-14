@@ -1,0 +1,6 @@
+# argumentos de sqr; expected sera calculado pela referencia
+-11    @example
+9      @example
+-1000
+0
+8      @hide

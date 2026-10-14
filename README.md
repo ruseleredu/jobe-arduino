@@ -60,6 +60,36 @@ sqr/
 - `expected`: saída esperada. `stdin` (opcional): entrada no stdin.
 - `example: true` → aparece na tabela "Por exemplo". `display: "HIDE"` → teste oculto.
 
+> **Não escreva o `expected` à mão** — use o `gen_tests.py` (abaixo): você fornece só
+> as entradas e ele calcula o `expected` rodando a solução de referência no Jobe.
+
+### Gerar o tests.json a partir das entradas — `gen_tests.py`
+
+Em vez de digitar os `expected`, descreva só os casos num arquivo simples e deixe a
+referência calcular as saídas:
+
+**`<base>_cases.txt`** (um caso por linha; `#` = comentário; marcadores `@example`/`@hide`):
+```text
+# com "call": "printf(\"%d\\n\", sqr({}))" no question.json -> a linha e so o argumento
+-11    @example
+9      @example
+-1000
+0
+8      @hide
+```
+Sem o `call` no `question.json`, cada linha é o **testcode completo**
+(ex.: `printf("%d\n", ehPar(4) ? 1 : 0)   @example`). Para casos com `stdin` ou mais
+controle, use `cases.json` (lista de `{testcode|args, stdin?, example?, display?}`, sem `expected`).
+
+```bash
+python gen_tests.py questions/sqr               # grava questions/sqr/sqr_tests.json
+python gen_tests.py questions --all             # todas as subpastas
+python gen_tests.py questions/sqr --force       # sobrescreve tests.json existente
+```
+
+`question.json` pode trazer `"call"` (template com `{}`) para o caso homogêneo em que
+só o argumento varia — aí o `cases.txt` fica com uma linha por argumento.
+
 ---
 
 ## Testar no Jobe — `jobe_test.py`
@@ -120,9 +150,11 @@ de `Arduino.h` fica disponível na compilação dentro do CodeRunner.
 ---
 
 ## Fluxo recomendado
-1. Crie a pasta da questão (enunciado, solução, testes, base do aluno).
-2. `python jobe_test.py <pasta>` → confirme que a referência passa nos testes.
-3. `python gen_moodle_xml.py <pasta> -o banco.xml` → importe no Moodle.
+1. Crie a pasta: `questiontext.html`, `<base>_sol.cpp`, `answerpreload.cpp`,
+   `question.json` e um `<base>_cases.txt` (só as entradas).
+2. `python gen_tests.py <pasta>` → gera o `<base>_tests.json` (expected via referência).
+3. `python jobe_test.py <pasta>` → confirme que a referência passa (ou teste uma entrega com `--answer`).
+4. `python gen_moodle_xml.py <pasta> --validate -o banco.xml` → gera e importe no Moodle.
 
 ## Importante (Jobe é estrito)
 O Jobe compila com `-Wall -Werror` (warnings viram erros). Mocks e código de apoio
@@ -134,6 +166,7 @@ teste depende do tamanho do ESP32, use `int32_t`/`uint8_t` explícitos.
 jobe-arduino/
 ├── docker-compose.yml          # sobe o Jobe em :4000
 ├── jobe_test.py                # testa no Jobe (modo pasta + modo flags)
+├── gen_tests.py                # gera tests.json das entradas (expected via referência)
 ├── gen_moodle_xml.py           # gera XML CodeRunner das pastas de questão
 ├── questions/                  # uma pasta por questão (sqr, ehpar, ...)
 ├── arduino-mock/               # Arduino.h, WiFi.h, PubSubClient.h (mocks)

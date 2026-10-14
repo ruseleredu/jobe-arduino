@@ -1,7 +1,25 @@
 [
-  { "testcode": "printf(\"%d\\n\", sqr(-11))",   "expected": "121",     "example": true },
-  { "testcode": "printf(\"%d\\n\", sqr(9))",     "expected": "81",      "example": true },
-  { "testcode": "printf(\"%d\\n\", sqr(-1000))", "expected": "1000000" },
-  { "testcode": "printf(\"%d\\n\", sqr(0))",     "expected": "0" },
-  { "testcode": "printf(\"%d\\n\", sqr(8))",     "expected": "64", "display": "HIDE" }
+  {
+    "testcode": "printf(\"%d\\n\", sqr(-11))",
+    "expected": "121",
+    "example": true
+  },
+  {
+    "testcode": "printf(\"%d\\n\", sqr(9))",
+    "expected": "81",
+    "example": true
+  },
+  {
+    "testcode": "printf(\"%d\\n\", sqr(-1000))",
+    "expected": "1000000"
+  },
+  {
+    "testcode": "printf(\"%d\\n\", sqr(0))",
+    "expected": "0"
+  },
+  {
+    "testcode": "printf(\"%d\\n\", sqr(8))",
+    "expected": "64",
+    "display": "HIDE"
+  }
 ]

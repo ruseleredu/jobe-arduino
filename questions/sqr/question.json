@@ -7,5 +7,6 @@
   "precheck": 0,
   "penaltyregime": "0, 10, 20, ...",
   "answerboxlines": 8,
-  "mocks": []
+  "mocks": [],
+  "call": "printf(\"%d\\n\", sqr({}))"
 }
