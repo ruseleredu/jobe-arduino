@@ -1,9 +1,5 @@
 # jobe-arduino
 
-> **Briefs reutilizáveis** (para pedir a uma IA novas aulas/questões): veja a pasta
-> `briefs/` — comece pelo `briefs/README-briefs.md` (índice e qual usar em cada caso).
-
-
 Testar **lógica pura** de C/C++ e código estilo Arduino no sandbox **Jobe**
 (Docker), sem hardware e sem Moodle — e **gerar questões CodeRunner** (XML) para
 importar no Moodle a partir das mesmas pastas.
@@ -16,15 +12,80 @@ importar no Moodle a partir das mesmas pastas.
 - **Docker** (único requisito para rodar — não precisa de g++ na máquina).
 - **Python 3** (só biblioteca padrão; nada a instalar).
 
-## Suba o Jobe
+## Dois modos de uso
+
+1. **Repo do toolkit (este):** tem os scripts, mocks e o `Dockerfile.pio-wokwi`.
+   Construa a imagem autocontida uma vez (e, opcionalmente, publique no Docker Hub —
+   veja `DOCKERHUB.md`):
+   ```bash
+   docker build -f Dockerfile.pio-wokwi -t ruseler/esp32-pio-wokwi:latest .
+   ```
+   O `docker compose up -d --build` aqui também constrói e sobe tudo. O build faz um
+   **`pio run` de aquecimento** (projeto de teste ESP32/Arduino) para já instalar a
+   plataforma e os toolchains na imagem — o 1º `pio run` em runtime fica rápido e
+   offline. (O volume `pio-cache` é semeado com esse cache na 1ª execução.)
+
+2. **Repo só de questões (recomendado para turmas):** contém **apenas** as questões
+   e um `docker-compose.yml` que usa a imagem **pronta** `esp32-pio-wokwi:local` (sem
+   `build`). Veja o modelo em `questions-repo-template/`. Dentro do container, o
+   toolkit está no `PATH` e os mocks vêm de `JOBE_ARDUINO_HOME` (baked na imagem), então
+   o repo de questões não carrega nenhum código do toolkit:
+   ```bash
+   docker compose up -d
+   docker compose exec esp32-pio-wokwi bash
+   new_question.py quiz01/minha_questao
+   gen_tests.py quiz01/minha_questao && jobe_test.py quiz01/minha_questao
+   gen_moodle_xml.py quiz01 --validate -o banco.xml
+   ```
+
+## Suba a stack (Jobe + container de ferramentas)
+O `docker-compose.yml` sobe **dois** serviços na mesma rede:
+- **`jobe`** — sandbox de correção (porta `4000` no host).
+- **`esp32-pio-wokwi`** (`esp32-pio-wokwi:local`) — container com **PlatformIO Core**,
+  **Wokwi CLI** e o toolkit (Python + Pygments), para validar o Jobe, testar as
+  questões e ajudar a elaborá-las. O repo é montado em `/work`.
+
 ```bash
-docker compose up -d          # usa o docker-compose.yml deste repo (Jobe em :4000)
-curl http://localhost:4000/jobe/index.php/restapi/languages   # deve listar "c", "cpp", ...
+docker compose up -d --build          # sobe jobe + esp32-pio-wokwi (build na 1a vez)
+curl http://localhost:4000/jobe/index.php/restapi/languages   # Jobe no ar? lista "c","cpp",...
+
+# trabalhe dentro do container de ferramentas:
+docker compose exec esp32-pio-wokwi bash
+#   dentro dele JOBE_URL=http://jobe ja e o default de --jobe (porta 80 na rede do compose):
+#   python gen_tests.py      questions/sqr
+#   python jobe_test.py      questions/sqr
+#   python gen_moodle_xml.py questions --validate -o banco.xml
+#   pio run            # compilar firmware ESP32 (num projeto PlatformIO)
+#   wokwi-cli .        # simular no Wokwi (precisa de WOKWI_CLI_TOKEN p/ CI)
 ```
-Sem compose: `docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest`
-(depois `docker start jobe` / `docker stop jobe`).
+
+Fora do container (no host), os scripts usam `http://localhost:4000` por padrão.
+Só o Jobe, sem compose: `docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest`.
+
+> O Wokwi CLI usa `WOKWI_CLI_TOKEN` (crie em wokwi.com/dashboard/ci). Exporte no host
+> antes do `up` para repassá-lo ao container: `export WOKWI_CLI_TOKEN=...`.
 
 ---
+
+## Criar uma questão nova — `new_question.py`
+
+Inicializa a pasta da questão, cria um **projeto PlatformIO** (ESP32 + Arduino, VS
+Code, sample-code) para prototipar/simular, e grava os arquivos-base do tipo escolhido.
+
+```bash
+python new_question.py sqr                         # coderunner (default)
+python new_question.py analise --type cloze        # cloze (análise de código)
+python new_question.py blink --mocks arduino-mock/Arduino.h   # coderunner c/ mock (vira cpp_function)
+python new_question.py x --no-pio                  # sem inicializar PlatformIO
+```
+
+O `pio project init` equivale a:
+```bash
+pio project init -b esp32dev -O "framework=arduino" -O "monitor_speed=115200" --ide vscode --sample-code
+```
+(roda dentro do container `esp32-pio-wokwi`, que tem o `pio`). Sem PlatformIO no
+PATH, o script avisa e apenas cria os arquivos da questão. Depois edite os
+arquivos-base e siga o fluxo do tipo (abaixo).
 
 ## Convenção de pasta por questão
 

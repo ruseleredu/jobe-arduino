@@ -1,0 +1,45 @@
+# esp32-pio-wokwi:local — imagem AUTOCONTIDA de ferramentas.
+# Empacota: Python 3 + PlatformIO Core + Wokwi CLI + Pygments e TODO o toolkit
+# (scripts, mocks, harness). Assim um repositorio SO de questoes pode usar a imagem
+# via `docker compose exec esp32-pio-wokwi bash`, sem carregar o codigo do toolkit.
+#
+# Build (no repo DEDICADO do toolkit, que contem este Dockerfile + os scripts/mocks):
+#   docker build -f Dockerfile.pio-wokwi -t esp32-pio-wokwi:local .
+FROM python:3.14-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git build-essential curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir platformio pygments
+
+RUN curl -L -o /usr/local/bin/wokwi-cli \
+        https://github.com/wokwi/wokwi-cli/releases/latest/download/wokwi-cli-linuxstatic-x64 \
+    && chmod +x /usr/local/bin/wokwi-cli
+
+# Aquecimento: cria um projeto de teste e COMPILA uma vez para instalar tudo o que
+# o ESP32/Arduino precisa (plataforma espressif32, framework Arduino, toolchains)
+# em /root/.platformio. Assim o 1o `pio run` em runtime e rapido e funciona offline.
+# Create the temporary directory explicitly, initialize, build, and clean up in a single RUN command
+RUN mkdir -p /tmp/pio-warmup \
+    && pio project init -d /tmp/pio-warmup -b esp32dev \
+       -O "framework=arduino" -O "monitor_speed=115200" --ide vscode --sample-code \
+    && pio run -d /tmp/pio-warmup \
+    && rm -rf /tmp/pio-warmup
+
+# ---- toolkit baked na imagem ----
+ENV JOBE_ARDUINO_HOME=/opt/jobe-arduino
+COPY jobe_test.py gen_tests.py gen_moodle_xml.py new_question.py $JOBE_ARDUINO_HOME/
+COPY arduino-mock/ $JOBE_ARDUINO_HOME/arduino-mock/
+COPY harness/      $JOBE_ARDUINO_HOME/harness/
+# scripts executaveis e no PATH (shebang #!/usr/bin/env python3)
+RUN chmod +x $JOBE_ARDUINO_HOME/*.py \
+    && ln -s $JOBE_ARDUINO_HOME/jobe_test.py      /usr/local/bin/jobe_test.py \
+    && ln -s $JOBE_ARDUINO_HOME/gen_tests.py      /usr/local/bin/gen_tests.py \
+    && ln -s $JOBE_ARDUINO_HOME/gen_moodle_xml.py /usr/local/bin/gen_moodle_xml.py \
+    && ln -s $JOBE_ARDUINO_HOME/new_question.py   /usr/local/bin/new_question.py
+
+# O repo de QUESTOES e montado aqui pelo compose (volume). Os mocks sao resolvidos
+# via JOBE_ARDUINO_HOME, entao o repo de questoes nao precisa carrega-los.
+WORKDIR /work
+CMD ["sleep", "infinity"]

@@ -41,8 +41,11 @@ Uso:
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
+
+DEFAULT_JOBE = os.environ.get("JOBE_URL", "http://localhost:4000")
 
 try:
     import jobe_test as jt
@@ -53,8 +56,11 @@ except Exception as e:  # noqa: BLE001
 MARCADORES = {"@example", "@hide", "@show"}
 
 
+TOOLKIT_HOME = os.environ.get("JOBE_ARDUINO_HOME") or os.path.dirname(os.path.abspath(__file__))
+
+
 def _resolve_mock(folder, rel):
-    for c in (Path(rel), folder.parent.parent / rel, folder.parent / rel):
+    for c in (Path(rel), folder.parent.parent / rel, folder.parent / rel, Path(TOOLKIT_HOME) / rel):
         if c.is_file():
             return str(c)
     raise SystemExit(f"ERRO: mock nao encontrado: {rel}")
@@ -211,7 +217,7 @@ def main(argv=None):
     ap.add_argument("folders", nargs="+", help="pasta(s) de questao ou contêiner")
     ap.add_argument("--all", action="store_true", help="trata cada arg como contêiner (usa subpastas)")
     ap.add_argument("--force", action="store_true", help="sobrescreve <base>_tests.json existente")
-    ap.add_argument("--jobe", default="http://localhost:4000", help="URL do Jobe (default: http://localhost:4000)")
+    ap.add_argument("--jobe", default=DEFAULT_JOBE, help=f"URL do Jobe (default: {DEFAULT_JOBE}; ou env JOBE_URL)")
     ap.add_argument("--apikey", help="X-API-KEY do Jobe, se exigido")
     args = ap.parse_args(argv)
 

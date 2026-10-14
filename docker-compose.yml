@@ -1,9 +1,42 @@
-name: jobe
+name: jobe-arduino
 
 services:
+  # Sandbox de correcao (compila/roda C/C++ com -Wall -Werror).
   jobe:
     image: trampgeek/jobeinabox:latest
     container_name: jobe
     restart: unless-stopped
     ports:
-      - "4000:80"   # API do Jobe -> http://localhost:4000/jobe/index.php/restapi/
+      - "4000:80"        # API do Jobe no host -> http://localhost:4000/jobe/index.php/restapi/
+    networks:
+      - labnet
+
+  # Container de ferramentas: PlatformIO Core + Wokwi CLI + toolkit (Python/Pygments).
+  # Use para validar o Jobe, testar as questoes e elaborar novas.
+  esp32-pio-wokwi:
+    build:
+      context: .
+      dockerfile: Dockerfile.pio-wokwi
+    image: ruseler/esp32-pio-wokwi:latest   # `docker compose build` ja marca com esta tag (pronta p/ push)
+    container_name: esp32-pio-wokwi
+    depends_on:
+      - jobe
+    networks:
+      - labnet
+    environment:
+      # Dentro da rede do compose, o Jobe escuta na porta 80 (o 4000:80 e so no host).
+      - JOBE_URL=http://jobe                # default de --jobe dos scripts dentro do container
+      - WOKWI_CLI_TOKEN=${WOKWI_CLI_TOKEN:-}   # opcional, p/ simular no Wokwi CI
+    volumes:
+      - .:/work                             # monta o repo (edite no host, rode aqui)
+      - pio-cache:/root/.platformio         # cache das toolchains do PlatformIO
+    working_dir: /work
+    tty: true
+    stdin_open: true
+
+networks:
+  labnet:
+    driver: bridge
+
+volumes:
+  pio-cache:

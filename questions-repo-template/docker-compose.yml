@@ -1,0 +1,32 @@
+# Repositorio SO de questoes — usa a imagem pronta esp32-pio-wokwi:local
+# (construida no repo dedicado do toolkit). Nao carrega o codigo do toolkit.
+name: quiz
+
+services:
+  jobe:
+    image: trampgeek/jobeinabox:latest
+    container_name: jobe
+    restart: unless-stopped
+    ports:
+      - "4000:80"
+    networks: [labnet]
+
+  esp32-pio-wokwi:
+    image: ruseler/esp32-pio-wokwi:latest   # baixada do Docker Hub (docker compose pull)
+    container_name: esp32-pio-wokwi
+    depends_on: [jobe]
+    networks: [labnet]
+    environment:
+      - JOBE_URL=http://jobe          # porta 80 na rede do compose
+      - WOKWI_CLI_TOKEN=${WOKWI_CLI_TOKEN:-}
+    volumes:
+      - .:/work                       # monta ESTE repo de questoes em /work
+      - pio-cache:/root/.platformio
+    working_dir: /work
+    tty: true
+    stdin_open: true
+
+networks:
+  labnet: { driver: bridge }
+volumes:
+  pio-cache:

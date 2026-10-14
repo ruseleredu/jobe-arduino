@@ -33,7 +33,22 @@ import urllib.error
 from pathlib import Path
 
 OK = 15  # outcome de sucesso do Jobe
-DEFAULT_JOBE = "http://localhost:4000"
+import os
+DEFAULT_JOBE = os.environ.get("JOBE_URL", "http://localhost:4000")
+
+# Raiz do toolkit (onde moram arduino-mock/, harness/). Permite rodar a partir de um
+# repo SO de questoes: os mocks sao resolvidos aqui (ex.: baked na imagem Docker).
+TOOLKIT_HOME = os.environ.get("JOBE_ARDUINO_HOME") or os.path.dirname(os.path.abspath(__file__))
+
+
+def resolve_asset(rel):
+    """Resolve um caminho de asset (ex.: 'arduino-mock/Arduino.h'): tenta relativo
+    ao CWD e, se nao existir, relativo ao TOOLKIT_HOME. Devolve str."""
+    p = Path(rel)
+    if p.is_file():
+        return str(p)
+    alt = Path(TOOLKIT_HOME) / rel
+    return str(alt if alt.is_file() else p)
 
 FUNCTION_TYPES = {"c_function", "cpp_function"}
 PROGRAM_TYPES = {"c_program", "cpp_program"}
@@ -51,9 +66,9 @@ def _strip_includes(text, nomes):
 # ---------- modo FLAGS: mocks + aluno + harness ----------
 def build_source(mock_paths, student_path, harness_path):
     nomes = [Path(m).name for m in mock_paths]
-    partes = [_strip_includes(Path(m).read_text(encoding="utf-8"), nomes) for m in mock_paths]
+    partes = [_strip_includes(Path(resolve_asset(m)).read_text(encoding="utf-8"), nomes) for m in mock_paths]
     aluno = _strip_includes(Path(student_path).read_text(encoding="utf-8"), nomes)
-    harness = Path(harness_path).read_text(encoding="utf-8")
+    harness = Path(resolve_asset(harness_path)).read_text(encoding="utf-8")
     return ("\n".join(partes) + "\n// ===== codigo do aluno =====\n" + aluno
             + "\n// ===== harness =====\n" + harness + "\n")
 
@@ -100,7 +115,7 @@ def build_question_source(mock_paths, answer_code, qtype, testcode, defines=None
        `defines` entram ANTES dos mocks (ex.: CORE_DEBUG_LEVEL para o log)."""
     nomes = [Path(m).name for m in mock_paths]
     lang = lang_de(qtype, mock_paths)
-    partes = [_strip_includes(Path(m).read_text(encoding="utf-8"), nomes) for m in mock_paths]
+    partes = [_strip_includes(Path(resolve_asset(m)).read_text(encoding="utf-8"), nomes) for m in mock_paths]
     answer = _strip_includes(answer_code, nomes)
     src = define_block(defines) + preamble_de(lang, mock_paths) + "\n".join(partes) + "\n" + answer + "\n"
     if qtype in FUNCTION_TYPES or mock_paths:

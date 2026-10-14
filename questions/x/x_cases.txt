@@ -1,0 +1,5 @@
+# Entradas de teste. Com "call" no question.json, a linha e so o argumento.
+# Marcadores no fim: @example (exemplo visivel) e @hide (teste oculto).
+1    @example
+2    @example
+3    @hide

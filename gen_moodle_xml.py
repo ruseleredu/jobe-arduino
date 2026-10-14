@@ -24,10 +24,13 @@ Uso:
 """
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
 from xml.sax.saxutils import escape
+
+DEFAULT_JOBE = os.environ.get("JOBE_URL", "http://localhost:4000")
 
 # defaults por campo da questao (espelham o export do CodeRunner)
 Q_DEFAULTS = {
@@ -67,9 +70,13 @@ def _strip_mock_includes(text):
     return pat.sub("// (include de mock removido)", text)
 
 
+TOOLKIT_HOME = os.environ.get("JOBE_ARDUINO_HOME") or os.path.dirname(os.path.abspath(__file__))
+
+
 def _resolve_mock(folder, rel):
-    """Resolve o caminho do mock: tenta cwd, depois a raiz do repo (acima de questions/)."""
-    cand = [Path(rel), folder.parent.parent / rel, folder.parent / rel]
+    """Resolve o mock: cwd, raiz do repo (acima de questions/), e o TOOLKIT_HOME
+    (ex.: baked na imagem Docker, para repos que so tem questoes)."""
+    cand = [Path(rel), folder.parent.parent / rel, folder.parent / rel, Path(TOOLKIT_HOME) / rel]
     for c in cand:
         if c.is_file():
             return c
@@ -473,7 +480,7 @@ def main(argv=None):
     ap.add_argument("-o", "--output", help="arquivo .xml de saida (default: stdout)")
     ap.add_argument("--validate", action="store_true",
                     help="roda a solucao de referencia no Jobe antes de gerar; falha se algum teste nao passar")
-    ap.add_argument("--jobe", default="http://localhost:4000", help="URL do Jobe (para --validate)")
+    ap.add_argument("--jobe", default=DEFAULT_JOBE, help=f"URL do Jobe (default: {DEFAULT_JOBE}; ou env JOBE_URL)")
     ap.add_argument("--apikey", help="X-API-KEY do Jobe (para --validate)")
     args = ap.parse_args(argv)
 

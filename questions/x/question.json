@@ -1,0 +1,9 @@
+{
+  "name": "x",
+  "type": "c_function",
+  "defaultgrade": 1,
+  "allornothing": 1,
+  "penaltyregime": "0, 10, 20, ...",
+  "mocks": [],
+  "call": "printf(\"%d\\n\", x({}))"
+}
