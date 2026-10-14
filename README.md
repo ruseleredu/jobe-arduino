@@ -1,5 +1,9 @@
 # jobe-arduino
 
+> **Briefs reutilizáveis** (para pedir a uma IA novas aulas/questões): veja a pasta
+> `briefs/` — comece pelo `briefs/README-briefs.md` (índice e qual usar em cada caso).
+
+
 Testar **lógica pura** de C/C++ e código estilo Arduino no sandbox **Jobe**
 (Docker), sem hardware e sem Moodle — e **gerar questões CodeRunner** (XML) para
 importar no Moodle a partir das mesmas pastas.
