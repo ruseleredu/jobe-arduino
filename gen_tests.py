@@ -125,6 +125,7 @@ def gerar_para(folder, jobe, apikey, force):
     qtype = meta.get("type", "c_function")
     call_tpl = meta.get("call", "")
     mocks = [_resolve_mock(folder, m) for m in meta.get("mocks", [])]
+    defines = meta.get("defines", [])
 
     sol = _achar(folder, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c"])
     if not sol:
@@ -144,7 +145,7 @@ def gerar_para(folder, jobe, apikey, force):
 
     tests = []
     for i, c in enumerate(casos, 1):
-        src, lang = jt.build_question_source(mocks, answer, qtype, c["testcode"])
+        src, lang = jt.build_question_source(mocks, answer, qtype, c["testcode"], defines)
         res = jt.run_jobe(jobe, src, c.get("stdin", ""), apikey, language=lang)
         if res["outcome"] == 11:
             print(f"ERRO [{base}] caso {i}: a REFERENCIA nao compila:\n{res['cmpinfo'].strip()}", file=sys.stderr)

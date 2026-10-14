@@ -132,19 +132,34 @@ def carrega_questao(folder):
     # guarda infos usadas pela validacao (--validate)
     q["base"] = base
     mocks = meta.get("mocks", [])
+    defines = meta.get("defines", [])
     q["mock_paths"] = [str(_resolve_mock(folder, m)) for m in mocks] if mocks else []
+    q["defines"] = defines
     q["answer_raw"] = q["answer"]
 
-    # Questoes com mocks Arduino: embute os mocks em globalextra + template C++.
+    # bloco de #define (ex.: CORE_DEBUG_LEVEL para o log) vai ANTES dos mocks
+    dblk = ""
+    if defines:
+        linhas = []
+        for d in defines:
+            d = str(d).strip()
+            if "=" in d:
+                nome, val = d.split("=", 1)
+                linhas.append(f"#define {nome.strip()} {val.strip()}")
+            else:
+                linhas.append(f"#define {d}")
+        dblk = "\n".join(linhas) + "\n"
+
+    # Questoes com mocks Arduino: embute defines + mocks em globalextra + template C++.
     if mocks:
         partes = [_strip_mock_includes(_resolve_mock(folder, m).read_text(encoding="utf-8")) for m in mocks]
-        q["globalextra"] = "\n".join(partes)
+        q["globalextra"] = dblk + "\n".join(partes)
         q["template"] = MOCK_TEMPLATE
         # a resposta e a base do aluno nao devem reincluir os mocks
         q["answer"] = _strip_mock_includes(q["answer"])
         q["answerpreload"] = _strip_mock_includes(q["answerpreload"])
     else:
-        q.setdefault("globalextra", "")
+        q.setdefault("globalextra", dblk)
         q.setdefault("template", "")
     return q
 
@@ -312,8 +327,9 @@ def validar(questoes, jobe_url, apikey):
         answer = q.get("answer_raw", q.get("answer", ""))
         casos = q.get("testcases", [])
         falhas = []
+        defines = q.get("defines", [])
         for i, c in enumerate(casos, 1):
-            src, lang = jt.build_question_source(mocks, answer, qtype, c.get("testcode", ""))
+            src, lang = jt.build_question_source(mocks, answer, qtype, c.get("testcode", ""), defines)
             res = jt.run_jobe(jobe_url, src, c.get("stdin", ""), apikey, language=lang)
             if res["outcome"] == 11:
                 falhas.append(f"TC{i}: erro de compilacao")

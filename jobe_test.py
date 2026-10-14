@@ -79,14 +79,30 @@ def preamble_de(lang, mocks):
     return "#include <cstdio>\n#include <cstdlib>\n#include <cstring>\n"
 
 
-def build_question_source(mock_paths, answer_code, qtype, testcode):
+def define_block(defines):
+    """Converte ['CORE_DEBUG_LEVEL=3', 'FOO'] em linhas #define (vao antes dos mocks)."""
+    if not defines:
+        return ""
+    linhas = []
+    for d in defines:
+        d = str(d).strip()
+        if "=" in d:
+            nome, val = d.split("=", 1)
+            linhas.append(f"#define {nome.strip()} {val.strip()}")
+        else:
+            linhas.append(f"#define {d}")
+    return "\n".join(linhas) + "\n"
+
+
+def build_question_source(mock_paths, answer_code, qtype, testcode, defines=None):
     """Monta o fonte de UM caso, no modelo do CodeRunner:
-       function -> answer + main{ testcode; } ; program -> answer (tem seu main)."""
+       function -> answer + main{ testcode; } ; program -> answer (tem seu main).
+       `defines` entram ANTES dos mocks (ex.: CORE_DEBUG_LEVEL para o log)."""
     nomes = [Path(m).name for m in mock_paths]
     lang = lang_de(qtype, mock_paths)
     partes = [_strip_includes(Path(m).read_text(encoding="utf-8"), nomes) for m in mock_paths]
     answer = _strip_includes(answer_code, nomes)
-    src = preamble_de(lang, mock_paths) + "\n".join(partes) + "\n" + answer + "\n"
+    src = define_block(defines) + preamble_de(lang, mock_paths) + "\n".join(partes) + "\n" + answer + "\n"
     if qtype in FUNCTION_TYPES or mock_paths:
         tc = testcode.strip()
         if tc and not tc.endswith(";") and not tc.endswith("}"):
@@ -171,6 +187,7 @@ def roda_modo_pasta(args):
     qtype = meta.get("type", "c_function")
     # mocks: caminhos relativos a raiz do repo (cwd), como no modo flags
     mocks = meta.get("mocks", [])
+    defines = meta.get("defines", [])
 
     if args.answer:
         answer = Path(args.answer).read_text(encoding="utf-8")
@@ -189,7 +206,7 @@ def roda_modo_pasta(args):
 
     passou = 0
     for i, c in enumerate(casos, 1):
-        src, lang = build_question_source(mocks, answer, qtype, c.get("testcode", ""))
+        src, lang = build_question_source(mocks, answer, qtype, c.get("testcode", ""), defines)
         res = run_jobe(args.jobe, src, c.get("stdin", ""), args.apikey, language=lang)
         passou = _casos_do_resultado(res, i, c.get("expected", ""), passou)
 

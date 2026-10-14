@@ -90,6 +90,19 @@ python gen_tests.py questions/sqr --force       # sobrescreve tests.json existen
 `question.json` pode trazer `"call"` (template com `{}`) para o caso homogêneo em que
 só o argumento varia — aí o `cases.txt` fica com uma linha por argumento.
 
+### Questões com log do ESP32 (`esp32-hal-log.h`)
+
+Mock em `arduino-mock/esp32-hal-log.h`: macros `log_e/log_w/log_i/log_d/log_v` com
+saída **determinística** `[<nível>] <msg>` (sem timestamp), respeitando
+`CORE_DEBUG_LEVEL` (filtragem em tempo de compilação, como no ESP32). Níveis:
+`NONE 0 · ERROR 1 · WARN 2 · INFO 3 · DEBUG 4 · VERBOSE 5` (default: VERBOSE).
+
+- Declare o mock: `"mocks": ["arduino-mock/esp32-hal-log.h"]`, `"type": "cpp_function"`.
+- Para fixar o nível (ensinar filtragem), use `"defines": ["CORE_DEBUG_LEVEL=2"]` no
+  `question.json` — o define é injetado antes dos mocks (no build e no `globalextra`
+  do XML). Exemplos prontos: `questions/logdemo` (nível 5, 5 linhas) e
+  `questions/logfilter` (nível 2, só W e E).
+
 ---
 
 ## Testar no Jobe — `jobe_test.py`
@@ -169,7 +182,7 @@ jobe-arduino/
 ├── gen_tests.py                # gera tests.json das entradas (expected via referência)
 ├── gen_moodle_xml.py           # gera XML CodeRunner das pastas de questão
 ├── questions/                  # uma pasta por questão (sqr, ehpar, ...)
-├── arduino-mock/               # Arduino.h, WiFi.h, PubSubClient.h (mocks)
+├── arduino-mock/               # Arduino.h, WiFi.h, PubSubClient.h, esp32-hal-log.h (mocks)
 ├── harness/                    # drivers do modo flags
 └── exemplos/                   # exemplos do modo flags (hello, payload, callback)
 ```
