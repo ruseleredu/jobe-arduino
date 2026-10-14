@@ -102,7 +102,91 @@ def achar(folder, base, sufixos):
     return None
 
 
-def carrega_questao(folder):
+def _lexer_por_nome(nome, code_lang=None):
+    """Escolhe um lexer Pygments pela extensao do arquivo ou por code_lang."""
+    from pygments.lexers import CLexer, CppLexer, PythonLexer, get_lexer_by_name
+    if code_lang:
+        try:
+            return get_lexer_by_name(code_lang)
+        except Exception:  # noqa: BLE001
+            pass
+    ext = Path(nome).suffix.lower()
+    if ext == ".c":
+        return CLexer()
+    if ext in (".py",):
+        return PythonLexer()
+    return CppLexer()  # .cpp/.ino/.h e default
+
+
+def highlight_html(codigo, nome, code_lang=None):
+    """Destaca o codigo com Pygments em HTML com estilos INLINE (sobrevive ao
+    filtro do Moodle, sem CSS externo). Se o Pygments faltar, usa <pre> simples."""
+    try:
+        from pygments import highlight
+        from pygments.formatters import HtmlFormatter
+    except Exception:  # noqa: BLE001
+        return "<pre><code>" + escape(codigo) + "</code></pre>"
+    lexer = _lexer_por_nome(nome, code_lang)
+    fmt = HtmlFormatter(noclasses=True, nowrap=False, style="friendly")
+    bloco = highlight(codigo, lexer, fmt)  # <div class="highlight"><pre>...styles inline...</pre></div>
+    # moldura leve para contraste em qualquer tema do Moodle
+    return ('<div style="border:1px solid #ddd;border-radius:6px;padding:6px 10px;'
+            'overflow:auto;">' + bloco + "</div>")
+
+
+def _achar_codigo(folder, base):
+    return achar(folder, base, [f"{base}_code.cpp", f"{base}_sol.cpp", "code.cpp", "sol.cpp",
+                                f"{base}_code.c", "code.c", f"{base}_code.ino", "code.ino",
+                                f"{base}_code.py", "code.py"])
+
+
+def _cloze_escape(s):
+    """Escapa caracteres de controle do Cloze para uso DENTRO de um campo embutido."""
+    for ch in ["\\", "{", "}", "~", "#", "=", "/"]:
+        s = s.replace(ch, "\\" + ch)
+    return s
+
+
+def _embute_codigo(html, folder, base, meta):
+    """Substitui {{CODE}} por codigo destacado (Pygments)."""
+    if "{{CODE}}" not in html:
+        return html
+    cf = _achar_codigo(folder, base)
+    if cf:
+        bloco = highlight_html(cf.read_text(encoding="utf-8").rstrip("\n"), cf.name, meta.get("code_lang"))
+    else:
+        bloco = "<pre><code>// (codigo nao encontrado)</code></pre>"
+    return html.replace("{{CODE}}", bloco)
+
+
+def _embute_saida(html, folder, base, meta, jobe, apikey):
+    """Substitui {{OUTPUT}} (valor p/ campo Cloze) e {{OUTPUT_BLOCK}} (bloco <pre>)
+    pela saida do codigo exibido, computada rodando-o no Jobe."""
+    if "{{OUTPUT}}" not in html and "{{OUTPUT_BLOCK}}" not in html:
+        return html
+    import jobe_test as jt
+    cf = _achar_codigo(folder, base)
+    if not cf:
+        raise SystemExit(f"ERRO [{base}]: {{OUTPUT}} pede o codigo exibido ({base}_code.cpp), nao encontrado")
+    ok, det = jt.jobe_no_ar(jobe, apikey)
+    if not ok:
+        raise SystemExit(f"ERRO [{base}]: {{OUTPUT}} precisa do Jobe em {jobe}: {det}\n"
+                         "  docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest")
+    mocks = [str(_resolve_mock(folder, m)) for m in meta.get("mocks", [])]
+    defines = meta.get("defines", [])
+    code_type = meta.get("code_type", "cpp_program")   # programa completo (tem main)
+    src, lang = jt.build_question_source(mocks, cf.read_text(encoding="utf-8"), code_type, "", defines)
+    res = jt.run_jobe(jobe, src, meta.get("stdin", ""), apikey, language=lang)
+    if res["outcome"] != jt.OK:
+        raise SystemExit(f"ERRO [{base}]: codigo exibido nao executou (outcome={res['outcome']})\n"
+                         f"{res.get('cmpinfo','').strip() or res.get('stderr','').strip()}")
+    saida = (res["stdout"] or "").rstrip("\n")
+    html = html.replace("{{OUTPUT}}", _cloze_escape(saida))
+    html = html.replace("{{OUTPUT_BLOCK}}", "<pre><code>" + escape(saida) + "</code></pre>")
+    return html
+
+
+def carrega_questao(folder, jobe="http://localhost:4000", apikey=None):
     folder = Path(folder)
     base = folder.name
     meta = {}
@@ -112,6 +196,19 @@ def carrega_questao(folder):
     q = dict(Q_DEFAULTS)
     q.update(meta)
     q.setdefault("name", base)
+
+    # ---- Cloze / Embedded Answers (multianswer): analise de codigo ----
+    if str(q.get("type", "")).lower() in ("cloze", "multianswer"):
+        q["_cloze"] = True
+        q["base"] = base
+        html = ler(folder / "questiontext.html", f"<p>{escape(base)}</p>")
+        html = _embute_codigo(html, folder, base, meta)       # {{CODE}} -> Pygments
+        html = _embute_saida(html, folder, base, meta, jobe, apikey)  # {{OUTPUT}}/{{OUTPUT_BLOCK}}
+        q["questiontext"] = html
+        q["generalfeedback"] = ler(folder / "generalfeedback.html", "")
+        if "penalty" not in meta:
+            q["penalty"] = 0.3333333
+        return q
 
     q["questiontext"] = ler(folder / "questiontext.html", f"<p>{escape(base)}</p>")
     q["generalfeedback"] = ler(folder / "generalfeedback.html", "")
@@ -193,7 +290,26 @@ def render_testcase(tc):
     </testcase>"""
 
 
+def render_cloze(q):
+    return f"""  <question type="cloze">
+    <name>
+      <text>{escape(str(q["name"]))}</text>
+    </name>
+    <questiontext format="html">
+      <text>{cdata(q["questiontext"])}</text>
+    </questiontext>
+    <generalfeedback format="html">
+      <text>{cdata(q.get("generalfeedback", ""))}</text>
+    </generalfeedback>
+    <penalty>{q.get("penalty", 0.3333333)}</penalty>
+    <hidden>{q.get("hidden", 0)}</hidden>
+    <idnumber></idnumber>
+  </question>"""
+
+
 def render_question(q):
+    if q.get("_cloze"):
+        return render_cloze(q)
     tcs = "\n".join(render_testcase(tc) for tc in q["testcases"])
     return f"""  <question type="coderunner">
     <name>
@@ -314,14 +430,19 @@ def validar(questoes, jobe_url, apikey):
         print(f"ERRO: --validate precisa de jobe_test.py ao lado deste script ({e})", file=sys.stderr)
         return False, []
 
-    ok, detalhe = jt.jobe_no_ar(jobe_url, apikey)
-    if not ok:
-        print(f"ERRO: Jobe indisponivel em {jobe_url}: {detalhe}\n"
-              "  docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest", file=sys.stderr)
-        return False, []
+    # so precisa de Jobe se houver questao coderunner (cloze nao executa)
+    if any(not q.get("_cloze") for q in questoes):
+        ok, detalhe = jt.jobe_no_ar(jobe_url, apikey)
+        if not ok:
+            print(f"ERRO: Jobe indisponivel em {jobe_url}: {detalhe}\n"
+                  "  docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest", file=sys.stderr)
+            return False, []
 
     relatorio, tudo_ok = [], True
     for q in questoes:
+        if q.get("_cloze"):
+            relatorio.append(f"  [--] {q['base']} (cloze: sem execucao a validar)")
+            continue
         qtype = q.get("type", "c_function")
         mocks = q.get("mock_paths", [])
         answer = q.get("answer_raw", q.get("answer", ""))
@@ -359,7 +480,7 @@ def main(argv=None):
     pastas = expandir_pastas(args.folders)
     if not pastas:
         ap.error("nenhuma pasta de questao valida encontrada")
-    questoes = [carrega_questao(p) for p in pastas]
+    questoes = [carrega_questao(p, args.jobe, args.apikey) for p in pastas]
 
     if args.validate:
         tudo_ok, relatorio = validar(questoes, args.jobe, args.apikey)

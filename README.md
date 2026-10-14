@@ -162,6 +162,55 @@ de `Arduino.h` fica disponível na compilação dentro do CodeRunner.
 
 ---
 
+## Questões de análise (Cloze / Embedded Answers)
+
+Para "mostre o código, o aluno compila/analisa e responde" (colar a saída ou uma
+enquete), o CodeRunner não é o ideal (ele é para o aluno *escrever* código). Use o
+tipo **Cloze** (`multianswer`): texto + código exibido + campos embutidos.
+
+Pasta (ex.: `questions/analisa_bits/`):
+```
+analisa_bits/
+├── question.json            # { "name": "...", "type": "cloze" }
+├── questiontext.html        # enunciado + {{CODE}} + campos Cloze (sintaxe abaixo)
+└── analisa_bits_code.cpp     # código EXIBIDO (entra onde está {{CODE}})
+```
+Placeholders no `questiontext.html` (substituídos na geração):
+- `{{CODE}}` → o código exibido (de `<base>_code.cpp`/`<base>_sol.cpp`), com
+  **syntax highlighting via Pygments** e estilos **inline** (renderiza no Moodle sem
+  CSS externo). Sem Pygments instalado, cai para `<pre><code>` simples.
+- `{{OUTPUT}}` → a **saída** do código, computada rodando-o no Jobe. Pensado para ir
+  **dentro de um campo** Cloze (ex.: `{1:SHORTANSWER:={{OUTPUT}}}`) — o `expected` é
+  preenchido sozinho, como no `gen_tests`. Requer Jobe no ar.
+- `{{OUTPUT_BLOCK}}` → a mesma saída como bloco `<pre>` (para explicação/feedback).
+
+`question.json` (cloze) aceita: `code_type` (como rodar o código p/ `{{OUTPUT}}`;
+default `cpp_program`), `code_lang` (lexer do Pygments; default pela extensão),
+`stdin`, `mocks`, `defines`. Dependência: `pip install pygments`. Cloze não usa
+`tests.json`/`gen_tests`; o `--validate` pula cloze (não há execução a validar), mas
+`{{OUTPUT}}` sempre exige Jobe.
+
+```bash
+python gen_moodle_xml.py questions/analisa_bits -o banco.xml   # mistura com coderunner no mesmo banco
+```
+
+### Sintaxe Cloze (campos embutidos)
+Forma geral: `{PESO:TIPO:opções}`. Dentro das opções: `=` marca a resposta certa,
+`~` separa alternativas, `%NN%` dá crédito parcial, `#` adiciona feedback.
+
+- **Resposta curta** (colar a saída/valor): `{1:SHORTANSWER:=2}`
+  (sem distinção de maiúsculas; use `SHORTANSWER_C` para diferenciar).
+- **Numérica** (aceita tolerância): `{1:NUMERICAL:=2:0}` (`=valor:erro`).
+- **Enquete/múltipla escolha**:
+  - menu suspenso: `{1:MULTICHOICE:=Certa~Errada1~Errada2}`
+  - rádio vertical: `{1:MULTICHOICE_V:=...}` · horizontal: `{1:MULTICHOICE_H:=...}`
+- **Múltipla resposta** (caixas): `{2:MULTIRESPONSE:=A~=B~C}` (várias corretas com `=`).
+- **Feedback por alternativa**: `{1:MULTICHOICE:=Certa#Boa!~Errada#Reveja X}`.
+- **Crédito parcial**: `{1:SHORTANSWER:=exato~%50%aproximado}`.
+
+Exemplo real em `questions/analisa_bits/questiontext.html` (saída via `SHORTANSWER`
++ duas enquetes `MULTICHOICE`). O `{{CODE}}` embute o programa exibido.
+
 ## Fluxo recomendado
 1. Crie a pasta: `questiontext.html`, `<base>_sol.cpp`, `answerpreload.cpp`,
    `question.json` e um `<base>_cases.txt` (só as entradas).
