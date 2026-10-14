@@ -1,0 +1,4 @@
+[
+  {"input": "on\n",  "expected": "1\n"},
+  {"input": "off\n", "expected": "0\n"}
+]

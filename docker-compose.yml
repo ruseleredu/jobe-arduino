@@ -1,0 +1,9 @@
+name: jobe
+
+services:
+  jobe:
+    image: trampgeek/jobeinabox:latest
+    container_name: jobe
+    restart: unless-stopped
+    ports:
+      - "4000:80"   # API do Jobe -> http://localhost:4000/jobe/index.php/restapi/
