@@ -181,6 +181,15 @@ def _mdl(folder):
     return m if m.is_dir() else Path(folder)
 
 
+def _qfolder(folder):
+    """Normaliza o caminho da questao: se apontarem para o .../mdl, usa a pasta-mae
+    (a pasta da questao). Assim aceita tanto `questions/sqr` quanto `questions/sqr/mdl`."""
+    p = Path(folder)
+    if p.name == "mdl" and p.parent != p:
+        return p.parent
+    return p
+
+
 def _casos_do_resultado(res, i, esperado, passou):
     if res["outcome"] == 11:
         print(f"[{i}] ERRO DE COMPILACAO\n{res['cmpinfo'].strip()}")
@@ -196,7 +205,7 @@ def _casos_do_resultado(res, i, esperado, passou):
 
 
 def roda_modo_pasta(args):
-    folder = Path(args.dir)
+    folder = _qfolder(args.dir)
     if not folder.is_dir():
         print(f"ERRO: pasta nao encontrada: {folder}", file=sys.stderr)
         return 2

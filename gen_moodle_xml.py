@@ -418,6 +418,8 @@ def expandir_pastas(paths):
     out = []
     for f in paths:
         p = Path(f)
+        if p.name == "mdl" and p.parent != p:   # aceita .../questao/mdl -> .../questao
+            p = p.parent
         if not p.is_dir():
             print(f"aviso: ignorando '{f}' (nao e pasta)", file=sys.stderr)
             continue

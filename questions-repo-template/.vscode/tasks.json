@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "jobe: gen_tests (pasta do arquivo)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"gen_tests.py '${relativeFileDirname}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: jobe_test (pasta do arquivo)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"jobe_test.py '${relativeFileDirname}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: gen_moodle_xml (pasta do arquivo)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"gen_moodle_xml.py '${relativeFileDirname}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: nova questao (pergunta o nome)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"new_question.py '${input:qnome}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: subir stack (compose up -d)",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "qnome",
+      "type": "promptString",
+      "description": "pasta da questao (ex.: quiz01/minha_questao)"
+    }
+  ]
+}

@@ -32,11 +32,14 @@ importar no Moodle a partir das mesmas pastas.
    o repo de questões não carrega nenhum código do toolkit:
    ```bash
    docker compose up -d
-   docker compose exec esp32-pio-wokwi bash
-   new_question.py quiz01/minha_questao
-   gen_tests.py quiz01/minha_questao && jobe_test.py quiz01/minha_questao
-   gen_moodle_xml.py quiz01 --validate -o banco.xml
+   # rode cada ferramenta como um comando único (sem entrar no shell):
+   docker compose exec esp32-pio-wokwi bash -c "new_question.py quiz01/minha_questao"
+   docker compose exec esp32-pio-wokwi bash -c "gen_tests.py quiz01/minha_questao"
+   docker compose exec esp32-pio-wokwi bash -c "jobe_test.py quiz01/minha_questao"
+   docker compose exec esp32-pio-wokwi bash -c "gen_moodle_xml.py quiz01"
    ```
+   > Dica: defina atalhos (aliases/funções) para não repetir o prefixo — veja
+   > [Atalhos no VS Code](#atalhos-no-vs-code-host).
 
 ## Suba a stack (Jobe + container de ferramentas)
 O `docker-compose.yml` sobe **dois** serviços na mesma rede:
@@ -49,18 +52,90 @@ O `docker-compose.yml` sobe **dois** serviços na mesma rede:
 docker compose up -d --build          # sobe jobe + esp32-pio-wokwi (build na 1a vez)
 curl http://localhost:4000/jobe/index.php/restapi/languages   # Jobe no ar? lista "c","cpp",...
 
-# trabalhe dentro do container de ferramentas:
+# rode cada ferramenta como um comando único (dentro dele JOBE_URL=http://jobe ja e o
+# default de --jobe — porta 80 na rede do compose):
+docker compose exec esp32-pio-wokwi bash -c "gen_tests.py questions/sqr"
+docker compose exec esp32-pio-wokwi bash -c "jobe_test.py questions/sqr"
+docker compose exec esp32-pio-wokwi bash -c "gen_moodle_xml.py questions"
+docker compose exec esp32-pio-wokwi bash -c "pio run -d questions/sqr"    # firmware ESP32
+docker compose exec esp32-pio-wokwi bash -c "wokwi-cli questions/sqr"     # simular (WOKWI_CLI_TOKEN p/ CI)
+
+# ou abra um shell interativo para várias ações seguidas:
 docker compose exec esp32-pio-wokwi bash
-#   dentro dele JOBE_URL=http://jobe ja e o default de --jobe (porta 80 na rede do compose):
-#   python gen_tests.py      questions/sqr
-#   python jobe_test.py      questions/sqr
-#   python gen_moodle_xml.py questions --validate -o banco.xml
-#   pio run            # compilar firmware ESP32 (num projeto PlatformIO)
-#   wokwi-cli .        # simular no Wokwi (precisa de WOKWI_CLI_TOKEN p/ CI)
 ```
 
 Fora do container (no host), os scripts usam `http://localhost:4000` por padrão.
 Só o Jobe, sem compose: `docker run -d --name jobe -p 4000:80 trampgeek/jobeinabox:latest`.
+
+### Atalhos no VS Code (host)
+
+Para não repetir `docker compose exec esp32-pio-wokwi bash -c "…"` a cada comando,
+defina **funções** no terminal integrado do VS Code (rode sempre a partir da pasta do
+repo, onde está o `docker-compose.yml`).
+
+**bash/zsh** — em `~/.bashrc` ou `~/.zshrc`:
+```bash
+# executa um comando qualquer no container de ferramentas
+ja()  { docker compose exec esp32-pio-wokwi bash -c "$*"; }
+# atalhos por ferramenta (encaminham os argumentos)
+nq()  { ja "new_question.py $*"; }       # nq quiz01/minha_questao   |  nq x --type cloze
+gt()  { ja "gen_tests.py $*"; }          # gt questions/sqr
+jt()  { ja "jobe_test.py $*"; }          # jt questions/sqr
+gx()  { ja "gen_moodle_xml.py $*"; }     # gx questions            (valida + grava mdl/quiz_to_import.xml)
+pw()  { ja "pio run -d $*"; }            # pw questions/sqr        (compila firmware)
+```
+Recarregue (`source ~/.bashrc`) e use: `nq quiz01/analise --type cloze`, `gt questions/sqr`,
+`jt questions/sqr`, `gx questions`.
+
+**PowerShell** (Windows) — em `$PROFILE`:
+```powershell
+function ja { docker compose exec esp32-pio-wokwi bash -c "$args" }
+function nq { ja "new_question.py $args" }
+function gt { ja "gen_tests.py $args" }
+function jt { ja "jobe_test.py $args" }
+function gx { ja "gen_moodle_xml.py $args" }
+```
+
+**Tarefas do VS Code** (Command Palette → *Run Task*): crie `.vscode/tasks.json` na raiz
+do repo para rodar nos arquivos abertos, sem decorar comandos:
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "jobe: gen_tests (pasta do arquivo)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"gen_tests.py '${relativeFileDirname}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: jobe_test (pasta do arquivo)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"jobe_test.py '${relativeFileDirname}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: gen_moodle_xml (pasta do arquivo)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"gen_moodle_xml.py '${relativeFileDirname}'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "jobe: nova questão (pergunta o nome)",
+      "type": "shell",
+      "command": "docker compose exec esp32-pio-wokwi bash -c \"new_question.py '${input:qnome}'\"",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    { "id": "qnome", "type": "promptString", "description": "pasta da questão (ex.: quiz01/minha_questao)" }
+  ]
+}
+```
+`${relativeFileDirname}` resolve para a pasta do arquivo aberto (ex.: com
+`questions/sqr/mdl/questiontext.html` aberto, as tasks rodam em `questions/sqr/mdl` —
+e os scripts sobem para a questão/`mdl` automaticamente). Edite o código no VS Code
+(host) e rode no container; o repo está montado em `/work`.
 
 > O Wokwi CLI usa `WOKWI_CLI_TOKEN` (crie em wokwi.com/dashboard/ci). Exporte no host
 > antes do `up` para repassá-lo ao container: `export WOKWI_CLI_TOKEN=...`.
