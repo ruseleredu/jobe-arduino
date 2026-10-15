@@ -482,13 +482,26 @@ def validar(questoes, jobe_url, apikey):
     return tudo_ok, relatorio
 
 
+def _default_output(pastas):
+    """Caminho padrao do -o quando omitido:
+       1 questao  -> <pasta>/mdl/quiz_to_import.xml (dentro do mdl/ se existir)
+       varias     -> <dir-pai-comum>/quiz_to_import.xml"""
+    if len(pastas) == 1:
+        return _mdl(pastas[0]) / "quiz_to_import.xml"
+    pai = Path(os.path.commonpath([str(p) for p in pastas]))
+    return pai / "quiz_to_import.xml"
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Gera XML CodeRunner (Moodle) de pasta(s) de questao.")
     ap.add_argument("folders", nargs="+",
                     help="pasta(s) de questao ou contêiner (ex.: questions/sqr, ou questions, ou questions/*)")
-    ap.add_argument("-o", "--output", help="arquivo .xml de saida (default: stdout)")
-    ap.add_argument("--validate", action="store_true",
-                    help="roda a solucao de referencia no Jobe antes de gerar; falha se algum teste nao passar")
+    ap.add_argument("-o", "--output",
+                    help="arquivo .xml de saida (default: <pasta>/mdl/quiz_to_import.xml; use '-' p/ stdout)")
+    ap.add_argument("--validate", dest="validate", action="store_true", default=True,
+                    help="roda a referencia no Jobe antes de gerar; falha se algum teste nao passar (PADRAO)")
+    ap.add_argument("--no-validate", dest="validate", action="store_false",
+                    help="nao valida no Jobe antes de gerar")
     ap.add_argument("--jobe", default=DEFAULT_JOBE, help=f"URL do Jobe (default: {DEFAULT_JOBE}; ou env JOBE_URL)")
     ap.add_argument("--apikey", help="X-API-KEY do Jobe (para --validate)")
     args = ap.parse_args(argv)
@@ -508,11 +521,13 @@ def main(argv=None):
             return 1
 
     xml = render_quiz(questoes)
-    if args.output:
-        Path(args.output).write_text(xml, encoding="utf-8")
-        print(f"gravado: {args.output}  ({len(questoes)} questao(oes))", file=sys.stderr)
-    else:
+    if args.output == "-":
         sys.stdout.write(xml)
+        return 0
+    destino = Path(args.output) if args.output else _default_output(pastas)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(xml, encoding="utf-8")
+    print(f"gravado: {destino}  ({len(questoes)} questao(oes))", file=sys.stderr)
     return 0
 
 

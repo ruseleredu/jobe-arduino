@@ -218,22 +218,30 @@ Desfechos por caso: **OK** · **SAIDA DIFERENTE** (mostra esperado × obtido) ·
 ## Gerar XML para o Moodle — `gen_moodle_xml.py`
 
 ```bash
-python gen_moodle_xml.py questions/sqr                        # 1 questão → stdout
-python gen_moodle_xml.py questions/sqr questions/ehpar -o banco.xml
-python gen_moodle_xml.py questions -o banco.xml               # todas as subpastas de questions/
+python gen_moodle_xml.py questions/sqr                        # valida + grava questions/sqr/mdl/quiz_to_import.xml
+python gen_moodle_xml.py questions/sqr questions/ehpar        # várias → questions/quiz_to_import.xml (pai comum)
+python gen_moodle_xml.py questions -o banco.xml               # todas as subpastas, saída explícita
 python gen_moodle_xml.py questions/* -o banco.xml             # idem (glob do shell)
+python gen_moodle_xml.py questions/sqr --no-validate -o -     # sem validar, XML no stdout
 ```
 
 Um argumento que é uma **pasta-questão** vira uma questão; um argumento que é uma
 **pasta-contêiner** (ex.: `questions`) expande para todas as subpastas-questão. Assim
 `questions` (contêiner) e `questions/*` (glob do bash) dão o mesmo resultado.
 
-**Validação opcional antes de gerar** (`--validate`): roda a solução de referência
-de cada questão no Jobe; se algum teste não passar, imprime o relatório e **não gera
-o XML** (exit ≠ 0). Ideal para CI.
+**Saída (`-o`) padrão:** quando você **não** passa `-o`, o XML é gravado em
+`<pasta>/mdl/quiz_to_import.xml` para uma única questão, ou em
+`<dir-pai-comum>/quiz_to_import.xml` quando há várias. Use `-o arquivo.xml` para
+escolher o nome/local, ou `-o -` para mandar ao **stdout**.
+
+**Validação antes de gerar — LIGADA por padrão:** roda a solução de referência de
+cada questão no Jobe; se algum teste não passar, imprime o relatório e **não gera o
+XML** (exit ≠ 0). Ideal para CI. Desligue com `--no-validate` (ex.: quando não há
+Jobe à mão e você só quer o XML).
 
 ```bash
-python gen_moodle_xml.py questions --validate -o banco.xml
+python gen_moodle_xml.py questions                 # valida tudo e grava questions/quiz_to_import.xml
+python gen_moodle_xml.py questions --no-validate    # sem Jobe; grava o XML mesmo assim
 # Jobe em outro host/porta: --jobe http://IP:4000  (--apikey se exigido)
 ```
 
@@ -302,7 +310,8 @@ Exemplo real em `questions/analisa_bits/questiontext.html` (saída via `SHORTANS
    `<base>_sol.cpp`, `answerpreload.cpp`, `question.json` e um `<base>_cases.txt` (só as entradas).
 2. `python gen_tests.py <pasta>` → gera o `<base>_tests.json` (expected via referência).
 3. `python jobe_test.py <pasta>` → confirme que a referência passa (ou teste uma entrega com `--answer`).
-4. `python gen_moodle_xml.py <pasta> --validate -o banco.xml` → gera e importe no Moodle.
+4. `python gen_moodle_xml.py <pasta>` → valida no Jobe (padrão) e grava
+   `<pasta>/mdl/quiz_to_import.xml`; importe esse arquivo no Moodle.
 
 ## Importante (Jobe é estrito)
 O Jobe compila com `-Wall -Werror` (warnings viram erros). Mocks e código de apoio

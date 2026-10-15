@@ -194,7 +194,6 @@ def main(argv=None):
         ap.error(f"{folder} ja existe (use --force)")
     folder.mkdir(parents=True, exist_ok=True)
     nome = args.name or base
-    cont = folder.parent  # contêiner (ex.: quiz01 ou questions) p/ gerar o banco
 
     # ---- modo template: copia uma pasta pronta e para por aqui ----
     if args.template:
@@ -211,7 +210,7 @@ def main(argv=None):
         print("Edite os arquivos (raiz = projeto PIO; mdl/ = questao) e depois:", file=sys.stderr)
         print(f"  python gen_tests.py {folder}\n"
               f"  python jobe_test.py {folder}\n"
-              f"  python gen_moodle_xml.py {cont} --validate -o banco.xml", file=sys.stderr)
+              f"  python gen_moodle_xml.py {folder}   # valida + grava {folder}/mdl/quiz_to_import.xml", file=sys.stderr)
         return 0
 
     # ---- modo padrao: pio init na raiz + arquivos-base em mdl/ ----
@@ -223,13 +222,13 @@ def main(argv=None):
 
     if args.type == "cloze":
         base_cloze(mdl, base, nome)
-        prox = (f"python gen_moodle_xml.py {folder} -o banco.xml   "
-                "# {{OUTPUT}} precisa do Jobe no ar")
+        prox = (f"python gen_moodle_xml.py {folder}   "
+                "# grava {folder}/mdl/quiz_to_import.xml ({{OUTPUT}} precisa do Jobe no ar)")
     else:
         base_coderunner(mdl, base, nome, args.mocks)
         prox = (f"python gen_tests.py {folder}\n"
                 f"  python jobe_test.py {folder}\n"
-                f"  python gen_moodle_xml.py {cont} --validate -o banco.xml")
+                f"  python gen_moodle_xml.py {folder}   # valida + grava {folder}/mdl/quiz_to_import.xml")
 
     print(f"\nPasta criada: {folder}  (tipo: {args.type}; arquivos da questao em {mdl})", file=sys.stderr)
     print("Edite os arquivos-base e depois:", file=sys.stderr)
