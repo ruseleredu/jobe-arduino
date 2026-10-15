@@ -20,7 +20,7 @@ new_question.py quiz01/analise --type cloze
 new_question.py quiz01/pisca --template blink # parte de um template baked na imagem
 gen_tests.py      quiz01/minha_questao
 jobe_test.py      quiz01/minha_questao
-gen_moodle_xml.py quiz01 --validate -o banco.xml
+gen_moodle_xml.py quiz01          # valida (padrão) + grava quiz01/quiz_to_import.xml
 ```
 
 ## Estrutura sugerida
