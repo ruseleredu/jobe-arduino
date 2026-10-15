@@ -74,6 +74,12 @@ def _achar(folder, nomes):
     return None
 
 
+def _mdl(folder):
+    """Pasta dos arquivos da questao: <folder>/mdl se existir, senao <folder>."""
+    m = Path(folder) / "mdl"
+    return m if m.is_dir() else Path(folder)
+
+
 def parse_linha_txt(linha, call_tpl):
     """Converte uma linha do cases.txt em dict {testcode, example, display}."""
     toks = linha.split()
@@ -124,8 +130,9 @@ def carregar_casos(folder, base, call_tpl):
 def gerar_para(folder, jobe, apikey, force):
     folder = Path(folder)
     base = folder.name
+    qdir = _mdl(folder)          # arquivos da questao em <folder>/mdl (ou <folder>)
     meta = {}
-    mj = folder / "question.json"
+    mj = qdir / "question.json"
     if mj.is_file():
         meta = json.loads(mj.read_text(encoding="utf-8"))
     qtype = meta.get("type", "c_function")
@@ -133,18 +140,18 @@ def gerar_para(folder, jobe, apikey, force):
     mocks = [_resolve_mock(folder, m) for m in meta.get("mocks", [])]
     defines = meta.get("defines", [])
 
-    sol = _achar(folder, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c"])
+    sol = _achar(qdir, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c"])
     if not sol:
         print(f"ERRO [{base}]: sem solucao de referencia ({base}_sol.cpp ou sol.cpp)", file=sys.stderr)
         return False
     answer = sol.read_text(encoding="utf-8")
 
-    casos = carregar_casos(folder, base, call_tpl)
+    casos = carregar_casos(qdir, base, call_tpl)
     if casos is None:
         print(f"ERRO [{base}]: sem arquivo de casos ({base}_cases.txt / cases.txt / cases.json)", file=sys.stderr)
         return False
 
-    destino = folder / f"{base}_tests.json"
+    destino = qdir / f"{base}_tests.json"
     if destino.exists() and not force:
         print(f"ERRO [{base}]: {destino.name} ja existe (use --force para sobrescrever)", file=sys.stderr)
         return False
@@ -177,11 +184,12 @@ def gerar_para(folder, jobe, apikey, force):
 
 
 def eh_pasta_questao(p):
-    if (p / "question.json").is_file():
-        return True
-    for n in (f"{p.name}_sol.cpp", "sol.cpp", f"{p.name}_sol.c", "sol.c"):
-        if (p / n).is_file():
+    for d in (p, p / "mdl"):
+        if (d / "question.json").is_file():
             return True
+        for n in (f"{p.name}_sol.cpp", "sol.cpp", f"{p.name}_sol.c", "sol.c"):
+            if (d / n).is_file():
+                return True
     return False
 
 

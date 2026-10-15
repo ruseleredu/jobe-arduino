@@ -175,6 +175,12 @@ def _achar(folder, nomes):
     return None
 
 
+def _mdl(folder):
+    """Pasta dos arquivos da questao: <folder>/mdl se existir, senao <folder>."""
+    m = Path(folder) / "mdl"
+    return m if m.is_dir() else Path(folder)
+
+
 def _casos_do_resultado(res, i, esperado, passou):
     if res["outcome"] == 11:
         print(f"[{i}] ERRO DE COMPILACAO\n{res['cmpinfo'].strip()}")
@@ -195,8 +201,9 @@ def roda_modo_pasta(args):
         print(f"ERRO: pasta nao encontrada: {folder}", file=sys.stderr)
         return 2
     base = folder.name
+    qdir = _mdl(folder)          # arquivos da questao em <folder>/mdl (ou <folder>)
     meta = {}
-    mj = folder / "question.json"
+    mj = qdir / "question.json"
     if mj.is_file():
         meta = json.loads(mj.read_text(encoding="utf-8"))
     qtype = meta.get("type", "c_function")
@@ -207,13 +214,13 @@ def roda_modo_pasta(args):
     if args.answer:
         answer = Path(args.answer).read_text(encoding="utf-8")
     else:
-        sol = _achar(folder, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c"])
+        sol = _achar(qdir, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c"])
         if not sol:
             print(f"ERRO [{base}]: sem solucao de referencia ({base}_sol.cpp ou sol.cpp)", file=sys.stderr)
             return 2
         answer = sol.read_text(encoding="utf-8")
 
-    tf = _achar(folder, [f"{base}_tests.json", "tests.json"])
+    tf = _achar(qdir, [f"{base}_tests.json", "tests.json"])
     if not tf:
         print(f"ERRO [{base}]: sem testes ({base}_tests.json ou tests.json)", file=sys.stderr)
         return 2

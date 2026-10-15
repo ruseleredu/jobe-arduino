@@ -14,9 +14,10 @@ toolkit (`Dockerfile.pio-wokwi`).
 docker compose pull
 docker compose up -d
 docker compose exec esp32-pio-wokwi bash
-# dentro do container (o toolkit esta no PATH; mocks vem de JOBE_ARDUINO_HOME):
-new_question.py quiz01/minha_questao          # cria pasta + PIO + arquivos-base
+# dentro do container (o toolkit esta no PATH; mocks e templates vem de JOBE_ARDUINO_HOME):
+new_question.py quiz01/minha_questao          # cria pasta: PIO na raiz + arquivos em mdl/
 new_question.py quiz01/analise --type cloze
+new_question.py quiz01/pisca --template blink # parte de um template baked na imagem
 gen_tests.py      quiz01/minha_questao
 jobe_test.py      quiz01/minha_questao
 gen_moodle_xml.py quiz01 --validate -o banco.xml
@@ -28,8 +29,13 @@ meu-quiz-repo/
 ├── docker-compose.yml     # este (usa a imagem pronta)
 ├── quiz01/                # um "contêiner" por lista/prova
 │   ├── minha_questao/
+│   │   ├── platformio.ini # projeto PIO (prototipar/simular) — raiz limpa
+│   │   └── mdl/           # arquivos da questao (question.json, _sol.cpp, _cases.txt, ...)
 │   └── analise/
+│       └── mdl/
 └── banco.xml              # gerado (importar no Moodle)
 ```
-`JOBE_URL=http://jobe` e `JOBE_ARDUINO_HOME` já vêm da imagem/compose — não precisa
-passar `--jobe` nem carregar os mocks aqui.
+Os arquivos da questão ficam em `<questao>/mdl/`; os scripts procuram lá (e caem
+para a raiz se não houver `mdl/`). `JOBE_URL=http://jobe`, `JOBE_ARDUINO_HOME`
+(mocks e `templates/`) já vêm da imagem/compose — não precisa passar `--jobe` nem
+carregar os mocks aqui.

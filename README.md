@@ -70,13 +70,17 @@ Só o Jobe, sem compose: `docker run -d --name jobe -p 4000:80 trampgeek/jobeina
 ## Criar uma questão nova — `new_question.py`
 
 Inicializa a pasta da questão, cria um **projeto PlatformIO** (ESP32 + Arduino, VS
-Code, sample-code) para prototipar/simular, e grava os arquivos-base do tipo escolhido.
+Code, sample-code) na raiz da pasta para prototipar/simular, e grava os
+arquivos-base da questão em **`<base>/mdl/`** (Moodle), deixando a raiz do projeto
+PIO limpa.
 
 ```bash
 python new_question.py sqr                         # coderunner (default)
 python new_question.py analise --type cloze        # cloze (análise de código)
 python new_question.py blink --mocks arduino-mock/Arduino.h   # coderunner c/ mock (vira cpp_function)
 python new_question.py x --no-pio                  # sem inicializar PlatformIO
+python new_question.py quiz01/minha_questao        # caminho = contêiner/questao
+python new_question.py blink-new --template blink  # copia templates/blink/ como base
 ```
 
 O `pio project init` equivale a:
@@ -87,18 +91,34 @@ pio project init -b esp32dev -O "framework=arduino" -O "monitor_speed=115200" --
 PATH, o script avisa e apenas cria os arquivos da questão. Depois edite os
 arquivos-base e siga o fluxo do tipo (abaixo).
 
+**`--template NOME`** copia uma pasta pronta de `templates/<NOME>/` (procurada no
+diretório atual e depois no `JOBE_ARDUINO_HOME`) para a nova questão — projeto PIO
+e `mdl/` juntos — e renomeia os arquivos `<NOME>_sol.cpp`, `<NOME>_cases.txt` etc.
+para o novo nome. Nesse modo o `pio init` e os arquivos-base são pulados (o template
+já é a base). Útil para partir de um esqueleto Wokwi/PIO padrão.
+
 ## Convenção de pasta por questão
 
-Cada questão é uma pasta (o nome da pasta é a "base"). Ex.: `questions/sqr/`:
+Cada questão é uma pasta (o nome da pasta é a "base"). A raiz guarda o projeto
+PlatformIO (para prototipar/simular) e os arquivos da questão ficam em **`mdl/`**.
+Ex.: `questions/sqr/`:
 
 ```
 sqr/
-├── question.json        # metadados (nome, tipo, nota, penaltyregime, mocks[])
-├── questiontext.html    # enunciado (HTML)       → <questiontext> no Moodle
-├── answerpreload.cpp    # base para o aluno      → <answerpreload>
-├── sqr_sol.cpp          # solução de referência  → <answer>   (fallback: sol.cpp)
-└── sqr_tests.json       # casos de teste         → <testcases> (fallback: tests.json)
+├── platformio.ini       # projeto PIO (prototipagem/simulação; opcional)
+├── src/ include/ ...     # fontes do projeto PIO
+└── mdl/                  # arquivos da questão (Moodle)
+    ├── question.json        # metadados (nome, tipo, nota, penaltyregime, mocks[])
+    ├── questiontext.html    # enunciado (HTML)       → <questiontext> no Moodle
+    ├── answerpreload.cpp    # base para o aluno      → <answerpreload>
+    ├── sqr_sol.cpp          # solução de referência  → <answer>   (fallback: sol.cpp)
+    └── sqr_tests.json       # casos de teste         → <testcases> (fallback: tests.json)
 ```
+
+> Todos os scripts (`gen_tests.py`, `jobe_test.py`, `gen_moodle_xml.py`) procuram os
+> arquivos da questão em `<pasta>/mdl/` e, se `mdl/` não existir, na própria pasta
+> (compatível com questões antigas sem `mdl/`). Com `--no-pio` a estrutura é a mesma:
+> só a raiz fica sem o projeto PlatformIO.
 
 **`question.json`:**
 ```json
@@ -147,7 +167,7 @@ Sem o `call` no `question.json`, cada linha é o **testcode completo**
 controle, use `cases.json` (lista de `{testcode|args, stdin?, example?, display?}`, sem `expected`).
 
 ```bash
-python gen_tests.py questions/sqr               # grava questions/sqr/sqr_tests.json
+python gen_tests.py questions/sqr               # grava questions/sqr/mdl/sqr_tests.json
 python gen_tests.py questions --all             # todas as subpastas
 python gen_tests.py questions/sqr --force       # sobrescreve tests.json existente
 ```
@@ -233,12 +253,13 @@ Para "mostre o código, o aluno compila/analisa e responde" (colar a saída ou u
 enquete), o CodeRunner não é o ideal (ele é para o aluno *escrever* código). Use o
 tipo **Cloze** (`multianswer`): texto + código exibido + campos embutidos.
 
-Pasta (ex.: `questions/analisa_bits/`):
+Pasta (ex.: `questions/analisa_bits/`) — arquivos da questão em `mdl/`:
 ```
 analisa_bits/
-├── question.json            # { "name": "...", "type": "cloze" }
-├── questiontext.html        # enunciado + {{CODE}} + campos Cloze (sintaxe abaixo)
-└── analisa_bits_code.cpp     # código EXIBIDO (entra onde está {{CODE}})
+└── mdl/
+    ├── question.json            # { "name": "...", "type": "cloze" }
+    ├── questiontext.html        # enunciado + {{CODE}} + campos Cloze (sintaxe abaixo)
+    └── analisa_bits_code.cpp     # código EXIBIDO (entra onde está {{CODE}})
 ```
 Placeholders no `questiontext.html` (substituídos na geração):
 - `{{CODE}}` → o código exibido (de `<base>_code.cpp`/`<base>_sol.cpp`), com
@@ -277,8 +298,8 @@ Exemplo real em `questions/analisa_bits/questiontext.html` (saída via `SHORTANS
 + duas enquetes `MULTICHOICE`). O `{{CODE}}` embute o programa exibido.
 
 ## Fluxo recomendado
-1. Crie a pasta: `questiontext.html`, `<base>_sol.cpp`, `answerpreload.cpp`,
-   `question.json` e um `<base>_cases.txt` (só as entradas).
+1. Crie a pasta (ex.: `new_question.py <pasta>`): em `mdl/` ficam `questiontext.html`,
+   `<base>_sol.cpp`, `answerpreload.cpp`, `question.json` e um `<base>_cases.txt` (só as entradas).
 2. `python gen_tests.py <pasta>` → gera o `<base>_tests.json` (expected via referência).
 3. `python jobe_test.py <pasta>` → confirme que a referência passa (ou teste uma entrega com `--answer`).
 4. `python gen_moodle_xml.py <pasta> --validate -o banco.xml` → gera e importe no Moodle.
@@ -292,10 +313,12 @@ teste depende do tamanho do ESP32, use `int32_t`/`uint8_t` explícitos.
 ```
 jobe-arduino/
 ├── docker-compose.yml          # sobe o Jobe em :4000
+├── new_question.py             # inicializa pasta de questão (PIO na raiz + arquivos em mdl/)
 ├── jobe_test.py                # testa no Jobe (modo pasta + modo flags)
 ├── gen_tests.py                # gera tests.json das entradas (expected via referência)
 ├── gen_moodle_xml.py           # gera XML CodeRunner das pastas de questão
-├── questions/                  # uma pasta por questão (sqr, ehpar, ...)
+├── questions/                  # uma pasta por questão (sqr, ehpar, ...); arquivos em <q>/mdl/
+├── templates/                  # esqueletos p/ new_question.py --template (opcional)
 ├── arduino-mock/               # Arduino.h, WiFi.h, PubSubClient.h, esp32-hal-log.h (mocks)
 ├── harness/                    # drivers do modo flags
 └── exemplos/                   # exemplos do modo flags (hello, payload, callback)

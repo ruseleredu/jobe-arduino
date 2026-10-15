@@ -1,0 +1,2 @@
+# argumento = LED_PIN; a funcao imprime os logs (CORE_DEBUG_LEVEL default = VERBOSE)
+2    @example

@@ -1,0 +1,5 @@
+# Entradas de teste (com "call" no question.json, a linha e so o argumento).
+0    @example
+1    @example
+5
+10   @hide

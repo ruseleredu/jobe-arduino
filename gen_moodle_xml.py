@@ -83,6 +83,12 @@ def _resolve_mock(folder, rel):
     raise SystemExit(f"ERRO: mock nao encontrado: {rel} (procurei em {[str(c) for c in cand]})")
 
 
+def _mdl(folder):
+    """Pasta dos arquivos da questao: <folder>/mdl se existir, senao <folder>."""
+    m = Path(folder) / "mdl"
+    return m if m.is_dir() else Path(folder)
+
+
 # Template C++ determinístico para questões com mocks Arduino.
 # Compila: includes + mocks (globalextra) + resposta do aluno + main por caso de teste.
 MOCK_TEMPLATE = """#include <cstdio>
@@ -154,11 +160,11 @@ def _cloze_escape(s):
     return s
 
 
-def _embute_codigo(html, folder, base, meta):
+def _embute_codigo(html, qdir, base, meta):
     """Substitui {{CODE}} por codigo destacado (Pygments)."""
     if "{{CODE}}" not in html:
         return html
-    cf = _achar_codigo(folder, base)
+    cf = _achar_codigo(qdir, base)
     if cf:
         bloco = highlight_html(cf.read_text(encoding="utf-8").rstrip("\n"), cf.name, meta.get("code_lang"))
     else:
@@ -166,13 +172,14 @@ def _embute_codigo(html, folder, base, meta):
     return html.replace("{{CODE}}", bloco)
 
 
-def _embute_saida(html, folder, base, meta, jobe, apikey):
+def _embute_saida(html, qdir, folder, base, meta, jobe, apikey):
     """Substitui {{OUTPUT}} (valor p/ campo Cloze) e {{OUTPUT_BLOCK}} (bloco <pre>)
-    pela saida do codigo exibido, computada rodando-o no Jobe."""
+    pela saida do codigo exibido, computada rodando-o no Jobe.
+    qdir: pasta dos arquivos da questao (<folder>/mdl); folder: raiz para achar mocks."""
     if "{{OUTPUT}}" not in html and "{{OUTPUT_BLOCK}}" not in html:
         return html
     import jobe_test as jt
-    cf = _achar_codigo(folder, base)
+    cf = _achar_codigo(qdir, base)
     if not cf:
         raise SystemExit(f"ERRO [{base}]: {{OUTPUT}} pede o codigo exibido ({base}_code.cpp), nao encontrado")
     ok, det = jt.jobe_no_ar(jobe, apikey)
@@ -196,8 +203,9 @@ def _embute_saida(html, folder, base, meta, jobe, apikey):
 def carrega_questao(folder, jobe="http://localhost:4000", apikey=None):
     folder = Path(folder)
     base = folder.name
+    qdir = _mdl(folder)          # arquivos da questao em <folder>/mdl (ou <folder>)
     meta = {}
-    mj = folder / "question.json"
+    mj = qdir / "question.json"
     if mj.is_file():
         meta = json.loads(mj.read_text(encoding="utf-8"))
     q = dict(Q_DEFAULTS)
@@ -208,27 +216,27 @@ def carrega_questao(folder, jobe="http://localhost:4000", apikey=None):
     if str(q.get("type", "")).lower() in ("cloze", "multianswer"):
         q["_cloze"] = True
         q["base"] = base
-        html = ler(folder / "questiontext.html", f"<p>{escape(base)}</p>")
-        html = _embute_codigo(html, folder, base, meta)       # {{CODE}} -> Pygments
-        html = _embute_saida(html, folder, base, meta, jobe, apikey)  # {{OUTPUT}}/{{OUTPUT_BLOCK}}
+        html = ler(qdir / "questiontext.html", f"<p>{escape(base)}</p>")
+        html = _embute_codigo(html, qdir, base, meta)       # {{CODE}} -> Pygments
+        html = _embute_saida(html, qdir, folder, base, meta, jobe, apikey)  # {{OUTPUT}}/{{OUTPUT_BLOCK}}
         q["questiontext"] = html
-        q["generalfeedback"] = ler(folder / "generalfeedback.html", "")
+        q["generalfeedback"] = ler(qdir / "generalfeedback.html", "")
         if "penalty" not in meta:
             q["penalty"] = 0.3333333
         return q
 
-    q["questiontext"] = ler(folder / "questiontext.html", f"<p>{escape(base)}</p>")
-    q["generalfeedback"] = ler(folder / "generalfeedback.html", "")
-    q["answerpreload"] = ler(achar(folder, base, ["answerpreload.cpp", "answerpreload.c",
-                                                   "answerpreload.py", "answerpreload.txt"]) or Path("/nonexistent"), "")
+    q["questiontext"] = ler(qdir / "questiontext.html", f"<p>{escape(base)}</p>")
+    q["generalfeedback"] = ler(qdir / "generalfeedback.html", "")
+    q["answerpreload"] = ler(achar(qdir, base, ["answerpreload.cpp", "answerpreload.c",
+                                                 "answerpreload.py", "answerpreload.txt"]) or Path("/nonexistent"), "")
 
-    sol = achar(folder, base, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c",
-                               f"{base}_sol.py", "sol.py"])
+    sol = achar(qdir, base, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c",
+                             f"{base}_sol.py", "sol.py"])
     if not sol:
         raise SystemExit(f"ERRO [{base}]: nao achei a solucao de referencia (ex.: {base}_sol.cpp ou sol.cpp)")
     q["answer"] = sol.read_text(encoding="utf-8")
 
-    tf = achar(folder, base, [f"{base}_tests.json", "tests.json"])
+    tf = achar(qdir, base, [f"{base}_tests.json", "tests.json"])
     if not tf:
         raise SystemExit(f"ERRO [{base}]: nao achei os testes (ex.: {base}_tests.json ou tests.json)")
     q["testcases"] = json.loads(tf.read_text(encoding="utf-8"))
@@ -392,14 +400,15 @@ def render_quiz(questoes):
 
 
 def eh_pasta_questao(p):
-    """True se p parece uma pasta de questao (tem question.json ou uma solucao)."""
-    if (p / "question.json").is_file():
-        return True
+    """True se p parece uma pasta de questao (question.json ou solucao, em p ou p/mdl)."""
     base = p.name
-    for n in (f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c",
-              f"{base}_sol.py", "sol.py"):
-        if (p / n).is_file():
+    for d in (p, p / "mdl"):
+        if (d / "question.json").is_file():
             return True
+        for n in (f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c",
+                  f"{base}_sol.py", "sol.py"):
+            if (d / n).is_file():
+                return True
     return False
 
 

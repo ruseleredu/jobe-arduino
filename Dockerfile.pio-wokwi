@@ -20,7 +20,7 @@ RUN curl -L -o /usr/local/bin/wokwi-cli \
 # Aquecimento: cria um projeto de teste e COMPILA uma vez para instalar tudo o que
 # o ESP32/Arduino precisa (plataforma espressif32, framework Arduino, toolchains)
 # em /root/.platformio. Assim o 1o `pio run` em runtime e rapido e funciona offline.
-# Create the temporary directory explicitly, initialize, build, and clean up in a single RUN command
+# O projeto temporario e removido; o cache (~/.platformio) fica na imagem.
 RUN mkdir -p /tmp/pio-warmup \
     && pio project init -d /tmp/pio-warmup -b esp32dev \
        -O "framework=arduino" -O "monitor_speed=115200" --ide vscode --sample-code \
@@ -32,6 +32,7 @@ ENV JOBE_ARDUINO_HOME=/opt/jobe-arduino
 COPY jobe_test.py gen_tests.py gen_moodle_xml.py new_question.py $JOBE_ARDUINO_HOME/
 COPY arduino-mock/ $JOBE_ARDUINO_HOME/arduino-mock/
 COPY harness/      $JOBE_ARDUINO_HOME/harness/
+COPY templates/    $JOBE_ARDUINO_HOME/templates/
 # scripts executaveis e no PATH (shebang #!/usr/bin/env python3)
 RUN chmod +x $JOBE_ARDUINO_HOME/*.py \
     && ln -s $JOBE_ARDUINO_HOME/jobe_test.py      /usr/local/bin/jobe_test.py \

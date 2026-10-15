@@ -1,0 +1,7 @@
+[
+  {
+    "testcode": "mostrarLogs(2)",
+    "expected": "[V] Log de Verbose: Informacao detalhada/baixa relevancia.\n[D] Log de Debug: Informacao para depuracao do sistema.\n[I] Log de Info: Sistema inicializado com sucesso no pino GPIO 2.\n[W] Log de Warning: Este e um exemplo de aviso!\n[E] Log de Error: Este e um exemplo de erro simulacao!",
+    "example": true
+  }
+]
