@@ -1,9 +1,0 @@
-{
-  "name": "ESP32 log: filtragem por nivel",
-  "type": "cpp_function",
-  "allornothing": 1,
-  "penaltyregime": "0, 10, 20, ...",
-  "mocks": ["arduino-mock/esp32-hal-log.h"],
-  "defines": ["CORE_DEBUG_LEVEL=2"],
-  "call": "mostrarLogs({})"
-}

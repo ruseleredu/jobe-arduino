@@ -1,3 +1,0 @@
-printf("%d\n", ehPar(4) ? 1 : 0)   @example
-printf("%d\n", ehPar(7) ? 1 : 0)   @example
-printf("%d\n", ehPar(0) ? 1 : 0)   @hide

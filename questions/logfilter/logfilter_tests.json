@@ -1,7 +1,0 @@
-[
-  {
-    "testcode": "mostrarLogs(2)",
-    "expected": "[W] Log de Warning: Este e um exemplo de aviso!\n[E] Log de Error: Este e um exemplo de erro simulacao!",
-    "example": true
-  }
-]
