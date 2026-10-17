@@ -35,7 +35,7 @@ define o padrão fixo do curso; o assistente entrega a aula pronta e validada.
 - **`grade.py`** (no `labNN-grupo-n`): `TAREFAS` = `token`, `nome`, `pontos`, `checks`. Tipos de check: `contem`, `nao_contem`, `compila` (`pio run`), `release` (gh api), `jobe` (executa no sandbox). Correção **por commit** (`git worktree`); gera `GRADE.md` + `nota.csv`.
 - Repo `labNN-grupo-n` autoconfigurável: deduz a aula pelo nome, descobre os grupos, corrige em paralelo (reutilizável `grade-one.yml` + `grade-all.yml`), lê grupos **read-only** (org secret `STUDENTS_TOKEN`), grava boletins em `notas/`. À prova de adulteração.
 - **`gen_grade.py`**: gera o scaffold do `grade.py` a partir dos CommitPoint do MDX (`-o grade.py`) e tem modo **`--check`** (compara MDX × `grade.py`, aponta divergências — para CI).
-- **Lógica pura no Jobe (sem Moodle):** mocks `Arduino.h`/`WiFi.h`/`PubSubClient.h` + harness + `jobe_test.py` (`--local`/`--jobe`) para avaliar comportamento (ver brief do Jobe). Firmware real → `pio run` + Wokwi.
+- **Lógica pura no Jobe (sem Moodle):** mocks (`Arduino.h`/`WiFi.h`/`PubSubClient.h`/`DHT.h`/`Ticker.h`/`esp32-hal-log.h`) + harness + `jobe_test.py` (`--jobe URL`) para avaliar comportamento (ver brief do Jobe). Questões para o Moodle (CodeRunner `*_function`/`arduino`, Cloze, `sql`) ficam em `<base>/mdl/` — veja os briefs de questão e os `exemplos/`. Firmware real → `pio run` + Wokwi.
 
 ## Fluxo ao criar a aula
 1. Escrever a aula em MDX com `CommitPoint` em cada tarefa (validar: `gen_grade.py aula.mdx --tarefas-only` deve listar T1…Tn com os pontos certos).
