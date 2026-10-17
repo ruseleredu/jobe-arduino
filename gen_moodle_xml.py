@@ -61,7 +61,7 @@ def ler(p, default=""):
 
 
 # Headers mockados cujos #include devem ser removidos ao embutir em globalextra.
-MOCK_NAMES = ["Arduino.h", "WiFi.h", "PubSubClient.h"]
+MOCK_NAMES = ["Arduino.h", "WiFi.h", "PubSubClient.h", "esp32-hal-log.h", "DHT.h", "Ticker.h"]
 
 
 def _strip_mock_includes(text):
@@ -101,6 +101,22 @@ MOCK_TEMPLATE = """#include <cstdio>
 
 int main() {
     {{ TEST.testcode }};
+    return 0;
+}
+"""
+
+# Template para SKETCH Arduino (setup/loop sem main): o harness chama setup() uma vez.
+# A resposta do aluno define setup()/loop(); nao ha testcode (a saida inteira e checada).
+ARDUINO_TEMPLATE = """#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+{{ QUESTION.globalextra }}
+
+{{ STUDENT_ANSWER }}
+
+int main() {
+    setup();
     return 0;
 }
 """
@@ -212,6 +228,23 @@ def carrega_questao(folder, jobe="http://localhost:4000", apikey=None):
     q.update(meta)
     q.setdefault("name", base)
 
+    # ---- SQL (CodeRunner tipo 'sql' / sqlite3): schema em globalextra, consulta = answer ----
+    if str(q.get("type", "")).lower() == "sql":
+        q["base"] = base
+        q["_sql"] = True
+        q["questiontext"] = ler(qdir / "questiontext.html", f"<p>{escape(base)}</p>")
+        q["generalfeedback"] = ler(qdir / "generalfeedback.html", "")
+        q["globalextra"] = ler(achar(qdir, base, ["schema.sql"]) or Path("/nonexistent"), "")
+        solq = achar(qdir, base, [f"{base}_sol.sql", "sol.sql"])
+        if not solq:
+            raise SystemExit(f"ERRO [{base}]: nao achei a consulta de referencia ({base}_sol.sql)")
+        q["answer"] = solq.read_text(encoding="utf-8")
+        tf = achar(qdir, base, [f"{base}_tests.json", "tests.json"])
+        q["testcases"] = json.loads(tf.read_text(encoding="utf-8")) if tf else [{"testcode": "", "expected": ""}]
+        q["answerpreload"] = ler(achar(qdir, base, ["answerpreload.sql"]) or Path("/nonexistent"), "")
+        q["template"] = ""   # usa o prototipo 'sql' embutido do CodeRunner
+        return q
+
     # ---- Cloze / Embedded Answers (multianswer): analise de codigo ----
     if str(q.get("type", "")).lower() in ("cloze", "multianswer"):
         q["_cloze"] = True
@@ -266,7 +299,8 @@ def carrega_questao(folder, jobe="http://localhost:4000", apikey=None):
     if mocks:
         partes = [_strip_mock_includes(_resolve_mock(folder, m).read_text(encoding="utf-8")) for m in mocks]
         q["globalextra"] = dblk + "\n".join(partes)
-        q["template"] = MOCK_TEMPLATE
+        # sketch Arduino -> template que chama setup(); demais -> main com testcode
+        q["template"] = ARDUINO_TEMPLATE if str(q.get("type", "")).lower() == "arduino" else MOCK_TEMPLATE
         # a resposta e a base do aluno nao devem reincluir os mocks
         q["answer"] = _strip_mock_includes(q["answer"])
         q["answerpreload"] = _strip_mock_includes(q["answerpreload"])
@@ -326,6 +360,9 @@ def render_question(q):
     if q.get("_cloze"):
         return render_cloze(q)
     tcs = "\n".join(render_testcase(tc) for tc in q["testcases"])
+    # 'arduino' e um sketch (setup/loop) com template proprio; no Moodle usa o
+    # tipo base cpp_program (compila e compara stdout), mas com o template Arduino.
+    coderunnertype = "cpp_program" if str(q.get("type", "")).lower() == "arduino" else str(q["type"])
     return f"""  <question type="coderunner">
     <name>
       <text>{escape(str(q["name"]))}</text>
@@ -340,7 +377,7 @@ def render_question(q):
     <penalty>{q["penalty"]}</penalty>
     <hidden>{q["hidden"]}</hidden>
     <idnumber></idnumber>
-    <coderunnertype>{escape(str(q["type"]))}</coderunnertype>
+    <coderunnertype>{escape(coderunnertype)}</coderunnertype>
     <prototypetype>0</prototypetype>
     <allornothing>{q["allornothing"]}</allornothing>
     <penaltyregime>{escape(str(q["penaltyregime"]))}</penaltyregime>
@@ -448,8 +485,8 @@ def validar(questoes, jobe_url, apikey):
         print(f"ERRO: --validate precisa de jobe_test.py ao lado deste script ({e})", file=sys.stderr)
         return False, []
 
-    # so precisa de Jobe se houver questao coderunner (cloze nao executa)
-    if any(not q.get("_cloze") for q in questoes):
+    # so precisa de Jobe se houver questao coderunner C/C++ (cloze e sql tratados a parte)
+    if any(not q.get("_cloze") and not q.get("_sql") for q in questoes):
         ok, detalhe = jt.jobe_no_ar(jobe_url, apikey)
         if not ok:
             print(f"ERRO: Jobe indisponivel em {jobe_url}: {detalhe}\n"
@@ -458,6 +495,9 @@ def validar(questoes, jobe_url, apikey):
 
     relatorio, tudo_ok = [], True
     for q in questoes:
+        if q.get("_sql"):
+            relatorio.append(f"  [--] {q['base']} (sql: expected gerado pelo gen_tests)")
+            continue
         if q.get("_cloze"):
             relatorio.append(f"  [--] {q['base']} (cloze: sem execucao a validar)")
             continue

@@ -137,8 +137,32 @@ def gerar_para(folder, jobe, apikey, force):
         meta = json.loads(mj.read_text(encoding="utf-8"))
     qtype = meta.get("type", "c_function")
     call_tpl = meta.get("call", "")
-    mocks = [_resolve_mock(folder, m) for m in meta.get("mocks", [])]
     defines = meta.get("defines", [])
+
+    # ---- SQL (sqlite3): schema.sql + consulta de referencia, UMA execucao ----
+    if qtype == "sql":
+        schema_f = _achar(qdir, ["schema.sql"])
+        schema = schema_f.read_text(encoding="utf-8") if schema_f else ""
+        solq = _achar(qdir, [f"{base}_sol.sql", "sol.sql"])
+        if not solq:
+            print(f"ERRO [{base}]: sem consulta de referencia ({base}_sol.sql)", file=sys.stderr)
+            return False
+        destino = qdir / f"{base}_tests.json"
+        if destino.exists() and not force:
+            print(f"ERRO [{base}]: {destino.name} ja existe (use --force)", file=sys.stderr)
+            return False
+        res = jt.run_jobe(jobe, schema + "\n" + solq.read_text(encoding="utf-8") + "\n", "", apikey, language="sqlite3")
+        if res["outcome"] != jt.OK:
+            print(f"ERRO [{base}]: a consulta de referencia falhou: "
+                  f"{res.get('cmpinfo','').strip() or res.get('stderr','').strip()}", file=sys.stderr)
+            return False
+        expected = (res["stdout"] or "").rstrip("\n")
+        destino.write_text(json.dumps([{"testcode": "", "expected": expected, "example": True}],
+                                      ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"gravado: {destino}  (1 consulta SQL)", file=sys.stderr)
+        return True
+
+    mocks = [_resolve_mock(folder, m) for m in meta.get("mocks", [])]
 
     sol = _achar(qdir, [f"{base}_sol.cpp", "sol.cpp", f"{base}_sol.c", "sol.c"])
     if not sol:
@@ -146,7 +170,11 @@ def gerar_para(folder, jobe, apikey, force):
         return False
     answer = sol.read_text(encoding="utf-8")
 
-    casos = carregar_casos(qdir, base, call_tpl)
+    if qtype == "arduino":
+        # sketch: UMA execucao (o harness chama setup()); a saida inteira e o 'expected'
+        casos = [{"testcode": "", "example": True, "display": "SHOW"}]
+    else:
+        casos = carregar_casos(qdir, base, call_tpl)
     if casos is None:
         print(f"ERRO [{base}]: sem arquivo de casos ({base}_cases.txt / cases.txt / cases.json)", file=sys.stderr)
         return False

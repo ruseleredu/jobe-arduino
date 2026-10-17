@@ -52,6 +52,7 @@ def resolve_asset(rel):
 
 FUNCTION_TYPES = {"c_function", "cpp_function"}
 PROGRAM_TYPES = {"c_program", "cpp_program"}
+ARDUINO_TYPES = {"arduino"}   # sketch Arduino: setup()/loop() sem main (harness chama setup())
 
 
 def _strip_includes(text, nomes):
@@ -111,12 +112,21 @@ def define_block(defines):
 
 def build_question_source(mock_paths, answer_code, qtype, testcode, defines=None):
     """Monta o fonte de UM caso, no modelo do CodeRunner:
-       function -> answer + main{ testcode; } ; program -> answer (tem seu main).
+       function -> answer + main{ testcode; } ; program -> answer (tem seu main);
+       arduino  -> mocks + answer(setup/loop) + main que chama setup() UMA vez.
        `defines` entram ANTES dos mocks (ex.: CORE_DEBUG_LEVEL para o log)."""
     nomes = [Path(m).name for m in mock_paths]
     lang = lang_de(qtype, mock_paths)
     partes = [_strip_includes(Path(resolve_asset(m)).read_text(encoding="utf-8"), nomes) for m in mock_paths]
     answer = _strip_includes(answer_code, nomes)
+
+    # Sketch Arduino: nao ha main no codigo; o harness chama setup() uma vez
+    # (como a "execucao unica" dos experimentos; loop() fica definido mas nao roda).
+    if qtype in ARDUINO_TYPES:
+        src = define_block(defines) + "\n".join(partes) + "\n" + answer + "\n"
+        src += "\nint main(void) {\n    setup();\n    return 0;\n}\n"
+        return src, "cpp"
+
     src = define_block(defines) + preamble_de(lang, mock_paths) + "\n".join(partes) + "\n" + answer + "\n"
     if qtype in FUNCTION_TYPES or mock_paths:
         tc = testcode.strip()
@@ -219,6 +229,32 @@ def roda_modo_pasta(args):
     # mocks: caminhos relativos a raiz do repo (cwd), como no modo flags
     mocks = meta.get("mocks", [])
     defines = meta.get("defines", [])
+
+    # ---- SQL (sqlite3 no Jobe): schema.sql + consulta do aluno ----
+    if qtype == "sql":
+        schema_f = _achar(qdir, ["schema.sql"])
+        schema = schema_f.read_text(encoding="utf-8") if schema_f else ""
+        if args.answer:
+            answer = Path(args.answer).read_text(encoding="utf-8")
+        else:
+            solq = _achar(qdir, [f"{base}_sol.sql", "sol.sql"])
+            if not solq:
+                print(f"ERRO [{base}]: sem consulta de referencia ({base}_sol.sql)", file=sys.stderr)
+                return 2
+            answer = solq.read_text(encoding="utf-8")
+        tf = _achar(qdir, [f"{base}_tests.json", "tests.json"])
+        if not tf:
+            print(f"ERRO [{base}]: sem testes ({base}_tests.json)", file=sys.stderr)
+            return 2
+        casos = json.loads(tf.read_text(encoding="utf-8"))
+        passou = 0
+        for i, c in enumerate(casos, 1):
+            src = schema + "\n" + answer + "\n"
+            res = run_jobe(args.jobe, src, c.get("stdin", ""), args.apikey, language="sqlite3")
+            passou = _casos_do_resultado(res, i, c.get("expected", ""), passou)
+        alvo = "referencia" if not args.answer else Path(args.answer).name
+        print(f"\n[{base}] {passou}/{len(casos)} casos passaram (testando: {alvo}).")
+        return 0 if passou == len(casos) else 1
 
     if args.answer:
         answer = Path(args.answer).read_text(encoding="utf-8")
