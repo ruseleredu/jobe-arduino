@@ -1,0 +1,10 @@
+{
+  "name": "Analise: mascara XOR",
+  "type": "cloze",
+  "penalty": 0.3333333,
+  "code_type": "arduino",
+  "code_lang": "cpp",
+  "mocks": [
+    "arduino-mock/Arduino.h"
+  ]
+}

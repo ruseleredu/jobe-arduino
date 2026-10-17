@@ -1,0 +1,7 @@
+{
+  "name": "SQL: media por grupo",
+  "type": "sql",
+  "defaultgrade": 1,
+  "allornothing": 1,
+  "penaltyregime": "0, 10, 20, ..."
+}

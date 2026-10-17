@@ -1,0 +1,7 @@
+[
+  {
+    "testcode": "",
+    "expected": "ciclo 1\nciclo 2\nciclo 3",
+    "example": true
+  }
+]
