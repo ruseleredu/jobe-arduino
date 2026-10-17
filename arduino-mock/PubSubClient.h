@@ -22,6 +22,11 @@ public:
   // connect (varias assinaturas, incl. Last Will)
   boolean connect(const char* id){ _connected=true; _clientId=id?id:""; return true; }
   boolean connect(const char* id, const char*, const char*){ return connect(id); }
+  // LWT (5 args): connect(id, willTopic, willQos, willRetain, willMessage)
+  boolean connect(const char* id, const char* willTopic, uint8_t, boolean willRetain,
+                  const char* willMsg){
+    _will = { willTopic?willTopic:"", willMsg?willMsg:"", (bool)willRetain }; return connect(id);
+  }
   boolean connect(const char* id, const char*, const char*,
                   const char* willTopic, uint8_t, boolean willRetain, const char* willMsg){
     _will = { willTopic?willTopic:"", willMsg?willMsg:"", (bool)willRetain }; return connect(id);
