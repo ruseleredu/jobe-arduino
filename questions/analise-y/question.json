@@ -1,7 +1,0 @@
-{
-  "name": "analise-y",
-  "type": "cloze",
-  "penalty": 0.3333333,
-  "code_type": "cpp_program",
-  "code_lang": "cpp"
-}
