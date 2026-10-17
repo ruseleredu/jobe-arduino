@@ -206,8 +206,28 @@ sqr/
   "mocks": []
 }
 ```
-- `type`: `c_function`, `c_program`, `cpp_function`, `cpp_program`.
+- `type`: `c_function`, `c_program`, `cpp_function`, `cpp_program` ou **`arduino`**.
 - `mocks`: vazio para C/C++ puro; `["arduino-mock/Arduino.h", ...]` para questões Arduino.
+
+### Tipo `arduino` — sketch com `setup()`/`loop()` (sem `main()`)
+
+Para questões em que o aluno trabalha com a **base do Arduino** (`setup()` e `loop()`),
+sem escrever `main()`. O toolkit monta o fonte como **mocks + código do aluno + um
+harness que chama `setup()` uma vez** (como a "execução única" dos experimentos; o
+`loop()` fica definido mas não roda). É o tipo ideal para:
+
+- **Completar o código** (fill-in): o enunciado mostra trechos comentados que o aluno
+  insere num esqueleto (`answerpreload.cpp`) e cola o sketch completo.
+- Qualquer questão cujo sketch deva rodar direto no PlatformIO/Wokwi.
+
+```json
+{ "name": "...", "type": "arduino", "mocks": ["arduino-mock/Arduino.h"] }
+```
+
+Não precisa de `<base>_cases.txt`: há **uma execução** e a **saída inteira** do sketch
+é o `expected` (gerado por `gen_tests.py`). No XML do Moodle vira um `cpp_program` com
+um *template* próprio que chama `setup()`. Nos **Cloze**, use `"code_type": "arduino"`
+para que o `{{OUTPUT}}` seja calculado rodando o sketch (via `setup()`).
 
 **`*_tests.json`** (alinhado ao CodeRunner — mesmo arquivo serve ao teste e ao XML):
 ```json
