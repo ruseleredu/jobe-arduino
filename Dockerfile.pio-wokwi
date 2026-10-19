@@ -29,7 +29,7 @@ RUN mkdir -p /tmp/pio-warmup \
 
 # ---- toolkit baked na imagem ----
 ENV JOBE_ARDUINO_HOME=/opt/jobe-arduino
-COPY jobe_test.py gen_tests.py gen_moodle_xml.py new_question.py $JOBE_ARDUINO_HOME/
+COPY jobe_test.py gen_tests.py gen_moodle_xml.py new_question.py gen_xml_html.py $JOBE_ARDUINO_HOME/
 COPY arduino-mock/ $JOBE_ARDUINO_HOME/arduino-mock/
 COPY harness/      $JOBE_ARDUINO_HOME/harness/
 COPY templates/    $JOBE_ARDUINO_HOME/templates/
@@ -37,7 +37,8 @@ COPY templates/    $JOBE_ARDUINO_HOME/templates/
 RUN chmod +x $JOBE_ARDUINO_HOME/*.py \
     && ln -s $JOBE_ARDUINO_HOME/jobe_test.py      /usr/local/bin/jobe_test.py \
     && ln -s $JOBE_ARDUINO_HOME/gen_tests.py      /usr/local/bin/gen_tests.py \
-    && ln -s $JOBE_ARDUINO_HOME/gen_moodle_xml.py /usr/local/bin/gen_moodle_xml.py \
+    && ln -s $JOBE_ARDUINO_HOME/gen_moodle_xml.py  /usr/local/bin/gen_moodle_xml.py \
+    && ln -s $JOBE_ARDUINO_HOME/gen_xml_html.py   /usr/local/bin/gen_xml_html.py \
     && ln -s $JOBE_ARDUINO_HOME/new_question.py   /usr/local/bin/new_question.py
 
 # O repo de QUESTOES e montado aqui pelo compose (volume). Os mocks sao resolvidos
