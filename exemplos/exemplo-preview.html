@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview — _mix.xml</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body { scroll-behavior: smooth; }
+  .qtext { overflow-x: auto; }
+  .qtext pre { white-space: pre-wrap; }
+  .card-header { background: #f8f9fa; }
+  pre code { white-space: pre; }
+  .sticky-top-bar { position: sticky; top: 0; z-index: 10; }
+</style>
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-dark bg-dark sticky-top-bar">
+  <div class="container-xl">
+    <span class="navbar-brand mb-0 h1">📋 Preview de questões</span>
+    <span class="navbar-text text-light small">_mix.xml</span>
+  </div>
+</nav>
+
+<div class="container-xl my-4">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <h5 class="mb-0 me-2">3 questões · 2 CodeRunner (sendo 1 SQL) · 1 Cloze</h5>
+    <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="filtro">
+      <button class="btn btn-outline-dark active" data-filtro="todas">Todas</button>
+      <button class="btn btn-outline-primary" data-filtro="coderunner">CodeRunner</button>
+      <button class="btn btn-outline-dark" data-filtro="sql">SQL</button>
+      <button class="btn btn-outline-info" data-filtro="cloze">Cloze</button>
+    </div>
+  </div>
+
+  
+  <div class="card shadow-sm mb-4 questao" data-tipo="coderunner"
+       data-crt="c_function">
+    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge text-bg-secondary">#1</span>
+      <span class="fw-semibold flex-grow-1">C function: sqr</span>
+      <span class="badge text-bg-light text-dark border">1 pt</span> <span class="badge text-bg-primary">CodeRunner · c_function</span>
+    </div>
+    <div class="card-body"><div class="qtext border rounded p-3 bg-body-tertiary"><p>Escreva <code>int sqr(int n)</code>.</p></div>
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse"
+                data-bs-target="#ans1">Resposta de referência</button>
+        <div class="collapse show mt-2" id="ans1"><pre class="mb-0 p-3 bg-dark text-light rounded small" style="overflow:auto"><code>int sqr(int n) { return n * n; }</code></pre></div>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold small text-muted">Casos de teste (2)</div>
+        <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle mb-0">
+          <thead class="table-light"><tr>
+            <th>#</th><th>Testcode</th><th>stdin</th><th>Esperado</th><th></th>
+          </tr></thead>
+          <tbody><tr><td class="text-muted">1</td><td><code>printf(&quot;%d\n&quot;, sqr(9))</code></td><td><code></code></td><td><pre class="mb-0 small">81</pre></td><td><span class="badge text-bg-success">exemplo</span> </td></tr><tr><td class="text-muted">2</td><td><code>printf(&quot;%d\n&quot;, sqr(8))</code></td><td><code></code></td><td><pre class="mb-0 small">64</pre></td><td><span class="badge text-bg-secondary">oculto</span> </td></tr></tbody>
+        </table></div>
+      </div></div>
+  </div>
+
+  <div class="card shadow-sm mb-4 questao" data-tipo="coderunner"
+       data-crt="sql">
+    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge text-bg-secondary">#2</span>
+      <span class="fw-semibold flex-grow-1">SQL: media por grupo</span>
+      <span class="badge text-bg-light text-dark border">1 pt</span> <span class="badge text-bg-dark">CodeRunner · sql</span>
+    </div>
+    <div class="card-body"><div class="qtext border rounded p-3 bg-body-tertiary"><p>Media de t por grupo.</p></div>
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse"
+                data-bs-target="#ans2">Resposta de referência</button>
+        <div class="collapse show mt-2" id="ans2"><pre class="mb-0 p-3 bg-dark text-light rounded small" style="overflow:auto"><code>SELECT grupo, AVG(t) FROM leituras GROUP BY grupo;</code></pre></div>
+      </div>
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse"
+                data-bs-target="#ge2">Setup / mocks / schema (globalextra)</button>
+        <div class="collapse  mt-2" id="ge2"><pre class="mb-0 p-3 bg-dark text-light rounded small" style="overflow:auto"><code>CREATE TABLE leituras(id,grupo,t);
+INSERT INTO leituras VALUES(1,&#x27;a&#x27;,24.5);</code></pre></div>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold small text-muted">Casos de teste (1)</div>
+        <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle mb-0">
+          <thead class="table-light"><tr>
+            <th>#</th><th>Testcode</th><th>stdin</th><th>Esperado</th><th></th>
+          </tr></thead>
+          <tbody><tr><td class="text-muted">1</td><td><code><span class="text-muted">(vazio)</span></code></td><td><code></code></td><td><pre class="mb-0 small">a|24.5</pre></td><td><span class="badge text-bg-success">exemplo</span> </td></tr></tbody>
+        </table></div>
+      </div></div>
+  </div>
+
+  <div class="card shadow-sm mb-4 questao" data-tipo="cloze"
+       data-crt="">
+    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge text-bg-secondary">#3</span>
+      <span class="fw-semibold flex-grow-1">Analise: mascara XOR</span>
+       <span class="badge text-bg-info">Cloze</span>
+    </div>
+    <div class="card-body"><div class="qtext border rounded p-3 bg-body-tertiary"><p>Analise o codigo.</p>
+<pre>printf("%d", reg ^ mask);</pre>
+<p>1) Saida? <span class="badge text-bg-warning text-dark me-1 mb-1" title="{1:SHORTANSWER:=10111101#Correto!}">▢ resposta curta: <strong>10111101</strong></span></p>
+<p>2) XOR serve para <span class="badge text-bg-warning text-dark me-1 mb-1" title="{1:MULTICHOICE:=inverter bits#Boa!~zerar#Seria AND~ligar#Seria OR}">▢ multipla escolha: <strong>inverter bits</strong></span></p></div></div>
+  </div>
+
+  <h4 class="mt-5 mb-3" id="config">⚙️ Configurações em comum</h4>
+  <p class="text-muted small">Campos presentes em todas as questões com o mesmo valor
+  (não precisam ser ajustados questão a questão na importação).</p>
+  
+    <table class="table table-sm table-striped table-bordered">
+      <thead class="table-dark"><tr><th>Configuração</th><th>campo XML</th><th>Valor (comum a todas)</th></tr></thead>
+      <tbody><tr><td colspan="3" class="text-muted">nenhuma configuração é idêntica em todas as questões</td></tr></tbody>
+    </table>
+  
+    <p class="text-muted small mt-3 mb-1">Configurações que <strong>variam</strong> entre as questões:</p>
+    <table class="table table-sm table-bordered">
+      <thead class="table-light"><tr><th>Configuração</th><th>campo XML</th><th>Valores encontrados</th></tr></thead>
+      <tbody><tr><td class="fw-semibold">Penalidade</td><td><code>penalty</code></td><td>0 · 0.3333333</td></tr><tr><td class="fw-semibold">Tipo (Moodle)</td><td><code>type</code></td><td>cloze · coderunner</td></tr></tbody>
+    </table>
+
+  <footer class="text-muted small mt-5 pt-3 border-top">
+    Gerado por <code>gen_xml_html.py</code> — pré-visualização; a correção real acontece no Moodle/Jobe.
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // filtro por tipo
+  document.querySelectorAll('[data-filtro]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-filtro]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.filtro;
+      document.querySelectorAll('.questao').forEach(c => {
+        let mostra = f === 'todas'
+          || (f === 'sql' && c.dataset.crt === 'sql')
+          || (f === c.dataset.tipo && f !== 'sql');
+        c.style.display = mostra ? '' : 'none';
+      });
+    });
+  });
+</script>
+</body>
+</html>
