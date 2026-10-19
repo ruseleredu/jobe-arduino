@@ -159,7 +159,7 @@ def highlight_html(codigo, nome, code_lang=None):
     fmt = HtmlFormatter(noclasses=True, nowrap=False, style="friendly")
     bloco = highlight(codigo, lexer, fmt)  # <div class="highlight"><pre>...styles inline...</pre></div>
     # moldura leve para contraste em qualquer tema do Moodle
-    return ('<div style="border:1px solid #ddd;border-radius:6px;padding:6px 10px;'
+    return ('<div style="border:1px solid #ddd;border-radius:6px;padding:8px 10px;'
             'overflow:auto;">' + bloco + "</div>")
 
 
